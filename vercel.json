@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    { "source": "/about", "destination": "/index.html" },
+    { "source": "/robotics-labs", "destination": "/index.html" },
+    { "source": "/stem-labs", "destination": "/index.html" },
+    { "source": "/ai-iot", "destination": "/index.html" },
+    { "source": "/software-solutions", "destination": "/index.html" },
+    { "source": "/projects", "destination": "/index.html" },
+    { "source": "/projects/:slug", "destination": "/index.html" },
+    { "source": "/training", "destination": "/index.html" },
+    { "source": "/career", "destination": "/index.html" },
+    { "source": "/gallery", "destination": "/index.html" },
+    { "source": "/contact", "destination": "/index.html" }
+  ]
+}
