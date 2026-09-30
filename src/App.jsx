@@ -8,6 +8,8 @@ import {
   useLocation,
   useParams,
 } from "react-router-dom";
+import aitechnoLogo from "./education/logoaitechno.png?url";
+import techLabVisual from "./images/tech-lab-visual.svg?url";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -37,6 +39,7 @@ import learningImage from "./images/images (8).jfif?url";
 import aiObjectDetectionImage from "./images/ai object detection.jfif?url";
 import bluetoothCarImage from "./images/Bluetooth control car.jfif?url";
 import fireDetectionImage from "./images/fire detection system.jfif?url";
+import dogRobotImage from "./images/Dog Robot.jfif?url";
 import humanoidRobotImage from "./images/Humnoid robot.jfif?url";
 import weatherStationImage from "./images/iot weather station.jfif?url";
 import rcPlaneImage from "./images/RC plane.jfif?url";
@@ -57,6 +60,13 @@ import scienceProjectImage from "./images/science and engineering project.jfif?u
 import studentTrainingImage from "./images/student trainning.jfif?url";
 import studentTranningImage from "./images/Student Tranning.jfif?url";
 import teacherTrainingImage from "./images/Teacher Trainning.jfif?url";
+import industry40Image from "./images/Industry 4,0.png?url";
+import additiveManufacturingImage from "./images/Additive maufacturing.png?url";
+import arVrLabImage from "./images/AR &VR virtual lab.png?url";
+import droneTechnologyImage from "./images/Drone Technology.png?url";
+import electricVehicleLabImage from "./images/Electric vehicle lab.png?url";
+import industrialRoboticsImage from "./images/Industrial Robotics.png?url";
+import plcTrainerImage from "./images/PlC trainer kit.png?url";
 
 const company = "Raj Infotech";
 const companyEmail = "sales@rajinfotechindia.com";
@@ -64,7 +74,7 @@ const contactEmail = "rajeev.bhargava@rajinfotechindia.com";
 const companyPhone = "+91 9829033023";
 const companyAddress =
   "106-107, Mahima Majesty, Ram Gali No. 6, Raja Park, Jaipur, Rajasthan 302004";
-const companyWebsite = "https://aitechno.org/";
+const companyWebsite = "/";
 const contactPath = "/contact";
 
 const photos = {
@@ -113,6 +123,24 @@ const projectList = [
     technology: "Microcontroller · Flame sensor · Buzzer",
   },
   {
+    slug: "dog-robot",
+    title: "Dog Robot",
+    category: "Robotics",
+    image: dogRobotImage,
+    description:
+      "Explore robotic movement and balance by building a four-legged robot with coordinated actuators.",
+    technology: "Microcontroller · Servos · Robotics",
+  },
+  {
+    slug: "drone",
+    title: "Drone",
+    category: "Robotics",
+    image: droneTechnologyImage,
+    description:
+      "Learn how flight, sensors and control systems work together in a programmable drone.",
+    technology: "Flight controller · Sensors · Programming",
+  },
+  {
     slug: "humanoid-robot",
     title: "Humanoid Robot",
     category: "Robotics",
@@ -120,6 +148,15 @@ const projectList = [
     description:
       "An introduction to coordinated movement, actuators and the challenges of human-inspired machines.",
     technology: "Robotics kit · Servos · Programming",
+  },
+  {
+    slug: "spider-robot",
+    title: "Spider Robot",
+    category: "Robotics",
+    image: spiderRobotImage,
+    description:
+      "Investigate multi-leg movement and mechanical coordination with a small walking robot.",
+    technology: "Microcontroller · Servos · Leg mechanisms",
   },
   {
     slug: "iot-weather-station",
@@ -147,15 +184,6 @@ const projectList = [
     description:
       "Combine proximity sensing and a small actuator to create a touch-free lid mechanism.",
     technology: "Arduino · Ultrasonic sensor · Servo",
-  },
-  {
-    slug: "spider-robot",
-    title: "Spider Robot",
-    category: "Robotics",
-    image: spiderRobotImage,
-    description:
-      "Investigate multi-leg movement and mechanical coordination with a small walking robot.",
-    technology: "Microcontroller · Servos · Leg mechanisms",
   },
 ];
 
@@ -202,27 +230,27 @@ const galleryItems = [
   },
 ];
 
+const vguLogo = new URL("./education/vgv.png", import.meta.url).href;
 const educationPartners = [
-  "vgv.png",
-  "CL1.png",
-  "CL2.png",
-  "CL4.png",
-  "CL3.png",
-  "Edt1.png",
-  "Edt2.png",
-  "Edt3.png",
-  "Edt5.png",
-  "Edt4.png",
-].map((filename) => `https://aitechno.org/assets/newimg/education/${filename}`);
-
+  new URL("./education/CL1.png", import.meta.url).href,
+  new URL("./education/CL2.png", import.meta.url).href,
+  new URL("./education/CL3.png", import.meta.url).href,
+  new URL("./education/CL4.png", import.meta.url).href,
+  new URL("./education/Edt1.png", import.meta.url).href,
+  new URL("./education/Edt2.png", import.meta.url).href,
+  new URL("./education/Edt3.png", import.meta.url).href,
+  new URL("./education/Edt4.png", import.meta.url).href,
+  new URL("./education/Edt5.png", import.meta.url).href,
+  vguLogo,
+];
 const softwarePartners = [
-  "picture1.png",
-  "picture2.jpg",
-  "picture3.png",
-  "picture4.jpg",
-  "picture5.jpg",
-  "picture6.jpg",
-].map((filename) => `https://aitechno.org/assets/newimg/bannner/${filename}`);
+  new URL("./collaboration/Cb1.png", import.meta.url).href,
+  new URL("./collaboration/Cb2.png", import.meta.url).href,
+  new URL("./collaboration/Cb4.png", import.meta.url).href,
+  new URL("./collaboration/Cb5.png", import.meta.url).href,
+  new URL("./collaboration/Cb6.png", import.meta.url).href,
+  new URL("./collaboration/Cb7.png", import.meta.url).href,
+];
 
 const navigation = [
   { label: "Home", to: "/" },
@@ -277,7 +305,7 @@ function Brand() {
   return (
     <Link to="/" className="brand" aria-label={`${company} home`}>
       <span className="brand-mark">
-        <img src="https://aitechno.org/assets/newimg/logoaitechno.png" alt="" />
+        <img src={aitechnoLogo} alt="" />
       </span>
       <span className="brand-name">
         Raj Infotech<span>Robotics & STEM lab solutions</span>
@@ -415,10 +443,10 @@ function Footer() {
           <a
             className="footer-note"
             href={companyWebsite}
-            target="_blank"
-            rel="noreferrer"
+            target={companyWebsite.startsWith("http") ? "_blank" : undefined}
+            rel={companyWebsite.startsWith("http") ? "noreferrer" : undefined}
           >
-            Visit aitechno.org ↗
+            Visit our website ↗
           </a>
           <div className="footer-contact">
             <a href={`tel:${companyPhone.replaceAll(" ", "")}`}>
@@ -645,43 +673,43 @@ function HomePage() {
     ],
     [
       "Drone Technology",
-      "https://aitechno.org/assets/newimg/product/product4.png",
+      droneTechnologyImage,
       "Emerging technology",
       "/robotics-labs#drone-technology",
     ],
     [
       "Industry 4.0",
-      "https://aitechno.org/assets/newimg/product/product5.png",
+      industry40Image,
       "Smart industry",
       "/ai-iot#industry-40",
     ],
     [
       "Additive Manufacturing",
-      "https://aitechno.org/assets/newimg/product/product6.png",
+      additiveManufacturingImage,
       "3D printing",
       "/stem-labs#additive-manufacturing",
     ],
     [
       "Electric Vehicle Lab",
-      "https://aitechno.org/assets/newimg/product/product7.png",
+      electricVehicleLabImage,
       "Electric mobility",
       "/stem-labs#ev-lab",
     ],
     [
       "AR & VR Virtual Lab",
-      "https://aitechno.org/assets/newimg/product/product8.png",
+      arVrLabImage,
       "Immersive learning",
       "/stem-labs#ar-vr-lab",
     ],
     [
       "Industrial Robotics",
-      "https://aitechno.org/assets/newimg/product/product9.png",
+      industrialRoboticsImage,
       "Industrial automation",
       "/robotics-labs#industrial-robotics",
     ],
     [
       "PLC Trainer Kit",
-      "https://aitechno.org/assets/newimg/product/product10.png",
+      plcTrainerImage,
       "Control systems",
       "/robotics-labs#plc-trainer",
     ],
@@ -785,6 +813,21 @@ function HomePage() {
           </span>
         </div>
       </section>
+      <section className="partners-section" aria-labelledby="partners-heading">
+        <div className="wrap">
+          <div className="partners-heading">
+            <span className="eyebrow">IN GOOD COMPANY</span>
+            <h2 id="partners-heading">Education partners</h2>
+          </div>
+          <div className="partners-grid">
+            {educationPartners.map((logo) => (
+              <div className="partner-logo" key={logo}>
+                <img src={logo} alt="" loading="lazy" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       <section className="section wrap home-why">
         <SectionHeading
           eyebrow="WHY A LAB?"
@@ -825,25 +868,6 @@ function HomePage() {
           </div>
         </div>
       </section>
-      <section className="partners-section" aria-labelledby="partners-heading">
-        <div className="wrap">
-          <div className="partners-heading">
-            <span className="eyebrow">IN GOOD COMPANY</span>
-            <h2 id="partners-heading">Education partners</h2>
-          </div>
-          <div className="partners-grid">
-            {educationPartners.map((logo, index) => (
-              <div className="partner-logo" key={logo}>
-                <img
-                  src={logo}
-                  alt={`Education partner ${index + 1}`}
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
       <section className="software-preview wrap">
         <div className="software-preview-copy">
           <span className="eyebrow">SOFTWARE SOLUTIONS</span>
@@ -873,7 +897,7 @@ function HomePage() {
           to="/projects"
         />
         <div className="project-strip">
-          {projectList.slice(0, 3).map((project, index) => (
+          {projectList.slice(0, 7).map((project, index) => (
             <Link
               to={`/projects/${project.slug}`}
               className="project-preview-item"
@@ -1039,7 +1063,7 @@ function AboutPage() {
           <div className="mission-vision-layout">
             <div className="mission-vision-visual">
               <img
-                src="https://aitechno.org/assets/images/service/service-2.png"
+                src={techLabVisual}
                 alt="Robotics and technology learning environment"
                 loading="lazy"
               />
@@ -1160,19 +1184,19 @@ function RoboticsPage() {
       "drone-technology",
       "Drone Technology",
       "Explore unmanned aerial systems, their components and the sensing and control ideas behind them.",
-      "https://aitechno.org/assets/newimg/product/product4.png",
+      studentRoboticsLabImage,
     ],
     [
       "industrial-robotics",
       "Industrial Robotics",
       "Introduce industrial robot systems, precision movement and the role of robotics in manufacturing workflows.",
-      "https://aitechno.org/assets/newimg/product/product9.png",
+      advancedRoboticsLabImage,
     ],
     [
       "plc-trainer",
       "PLC Trainer Kit",
       "Practise PLC and HMI programming with digital and analogue I/O, and explore Modbus, Ethernet and CANopen communication.",
-      "https://aitechno.org/assets/newimg/product/product10.png",
+      electronicsLabImage,
     ],
   ];
   return (
@@ -1362,19 +1386,19 @@ function StemPage() {
       "additive-manufacturing",
       "Additive Manufacturing",
       "Introduce digital design, rapid prototyping and the layer-by-layer process of 3D printing.",
-      "https://aitechno.org/assets/newimg/product/product6.png",
+      additiveManufacturingImage,
     ],
     [
       "ev-lab",
       "Electric Vehicle Lab",
       "Explore electric mobility through learning pathways in battery systems, motors and charging technology.",
-      "https://aitechno.org/assets/newimg/product/product7.png",
+      electricVehicleLabImage,
     ],
     [
       "ar-vr-lab",
       "AR & VR Virtual Lab",
       "Create immersive learning experiences and explore the hardware and software behind augmented and virtual reality.",
-      "https://aitechno.org/assets/newimg/product/product8.png",
+      arVrLabImage,
     ],
   ];
   return (
@@ -1536,7 +1560,7 @@ function AiIotPage() {
         "Automation",
         "Connected systems",
       ],
-      image: "https://aitechno.org/assets/newimg/product/product5.png",
+      image: industry40Image,
     },
   ];
   return (
@@ -2013,6 +2037,76 @@ function CareerPage() {
           />
         </section>
       </div>
+      <section className="section section-tint">
+        <div className="wrap">
+          <SectionHeading
+            eyebrow="AREAS OF WORK"
+            title="Bring your skills into the learning lab."
+            description="We welcome profiles for current or future opportunities across practical education, lab solutions and technology projects."
+          />
+          <div className="benefit-grid">
+            {[
+              [
+                "01",
+                "Robotics & STEM training",
+                "Help learners and educators explore robotics, electronics and STEM concepts through guided, hands-on sessions.",
+              ],
+              [
+                "02",
+                "Lab setup & applications",
+                "Connect lab equipment, learning goals and project activities to create useful setups for schools and institutions.",
+              ],
+              [
+                "03",
+                "AI, IoT & project mentoring",
+                "Support practical builds involving sensors, connected devices, computer vision and student-led prototypes.",
+              ],
+            ].map(([number, title, copy]) => (
+              <article className="benefit" key={number}>
+                <span className="benefit-number">{number}</span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="section wrap">
+        <SectionHeading
+          eyebrow="START A CONVERSATION"
+          title="Give us a clear picture of your work."
+          description="A focused introduction helps us understand where your experience could fit."
+        />
+        <div className="benefit-grid">
+          {[
+            [
+              "01",
+              "Share your profile",
+              "Include your CV or portfolio and the city or location you are available for.",
+            ],
+            [
+              "02",
+              "Tell us what you work with",
+              "Mention relevant tools, technologies, training experience and projects you have built or supported.",
+            ],
+            [
+              "03",
+              "Describe the work you want to do",
+              "Let us know whether you are interested in training, lab applications, engineering or project mentoring.",
+            ],
+          ].map(([number, title, copy]) => (
+            <article className="benefit" key={number}>
+              <span className="benefit-number">{number}</span>
+              <div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
@@ -2456,7 +2550,7 @@ export default function App() {
       "@type": "Organization",
       name: company,
       url: `${window.location.origin}/`,
-      logo: "https://aitechno.org/assets/newimg/logoaitechno.png",
+      logo: new URL(aitechnoLogo, window.location.origin).href,
       description:
         "Jaipur-based technology company providing robotics lab setups, technical education, software solutions and training.",
       telephone: companyPhone,
