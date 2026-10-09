@@ -9,6 +9,7 @@
     { "source": "/projects/:slug", "destination": "/index.html" },
     { "source": "/training", "destination": "/index.html" },
     { "source": "/career", "destination": "/index.html" },
+    { "source": "/interview/start", "destination": "/index.html" },
     { "source": "/gallery", "destination": "/index.html" },
     { "source": "/contact", "destination": "/index.html" }
   ]

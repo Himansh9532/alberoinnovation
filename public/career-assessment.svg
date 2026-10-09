@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 420" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="38" y1="25" x2="510" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECF5FF"/>
+      <stop offset="1" stop-color="#F8F1E9"/>
+    </linearGradient>
+    <linearGradient id="top" x1="176" y1="257" x2="324" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D97857"/>
+      <stop offset="1" stop-color="#B95645"/>
+    </linearGradient>
+  </defs>
+  <rect width="560" height="420" rx="30" fill="url(#bg)"/>
+  <circle cx="280" cy="210" r="154" fill="#D9EAF8"/>
+  <circle cx="280" cy="210" r="130" stroke="#fff" stroke-width="2"/>
+  <rect x="341" y="83" width="153" height="124" rx="18" fill="#fff" stroke="#DEE7EF" stroke-width="2"/>
+  <rect x="361" y="104" width="71" height="7" rx="3.5" fill="#34495D"/>
+  <rect x="361" y="120" width="112" height="5" rx="2.5" fill="#D9E1E8"/>
+  <path d="M364 179v-22h14v22m10 0v-42h14v42m10 0v-31h14v31m10 0v-53h14v53" stroke="#4C82AE" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <path d="m365 150 30-15 25 8 34-25" stroke="#E68B5A" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+  <path d="M152 420c5-97 39-151 128-151 88 0 122 54 128 151H152Z" fill="url(#top)"/>
+  <path d="m242 278 38 49 38-49-14-16h-48l-14 16Z" fill="#fff"/>
+  <path d="m242 278 16 24-9 118m89-142-16 24 9 118" stroke="#314355" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <path d="M219 157c0-51 27-82 68-82 43 0 70 31 70 82v44c0 49-29 83-70 83-40 0-68-34-68-83v-44Z" fill="#F0C5A3"/>
+  <path d="M210 165c-4-61 24-103 79-103 51 0 80 38 78 93l-4 25c-17-7-34-25-40-47-16 22-45 35-88 41l-12 24-13-33Z" fill="#283748"/>
+  <path d="M241 177c5-4 12-4 17 0m42 0c5-4 12-4 17 0" stroke="#354657" stroke-linecap="round" stroke-width="3"/>
+  <path d="M268 186c-2 10-4 16-8 20 3 3 8 4 12 3m-18 20c10 8 24 8 34 0" stroke="#B97668" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+  <circle cx="142" cy="164" r="18" fill="#fff"/>
+  <path d="m134 164 6 6 11-13" stroke="#478269" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+</svg>

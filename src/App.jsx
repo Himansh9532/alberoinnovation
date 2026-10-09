@@ -1,2604 +1,2184 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
-  Link,
-  Navigate,
-  NavLink,
-  Route,
-  Routes,
-  useLocation,
-  useParams,
-} from "react-router-dom";
-import aitechnoLogo from "./education/logoaitechno.png?url";
-import techLabVisual from "./images/tech-lab-visual.svg?url";
-import {
-  ArrowDownRight,
-  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
+  Bell,
+  BookOpenText,
+  BrainCircuit,
+  BriefcaseBusiness,
   Check,
   ChevronDown,
-  CircuitBoard,
-  Cpu,
-  FlaskConical,
-  Lightbulb,
+  Database,
+  Download,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  FileText,
+  FolderKanban,
+  GraduationCap,
+  Layers3,
+  LoaderCircle,
   Menu,
   Moon,
-  MoveUpRight,
-  X,
+  Search,
+  ShieldCheck,
+  Sparkles,
   Sun,
+  Target,
+  TimerReset,
+  TrendingUp,
+  UserRound,
+  X,
 } from "lucide-react";
-import classroomImage from "./images/images (1).jfif?url";
-import studentImage from "./images/images (2).jfif?url";
-import workshopImage from "./images/images (2).jfif?url";
-import electronicsImage from "./images/images (4).jfif?url";
-import roboticsImage from "./images/images (4).jfif?url";
-import labImage from "./images/images (1).jfif?url";
-import teamworkImage from "./images/images (2).jfif?url";
-import codingImage from "./images/ai object detection.jfif?url";
-import learningImage from "./images/images (8).jfif?url";
-import aiObjectDetectionImage from "./images/ai object detection.jfif?url";
-import bluetoothCarImage from "./images/Bluetooth control car.jfif?url";
-import fireDetectionImage from "./images/fire detection system.jfif?url";
-import dogRobotImage from "./images/Dog Robot.jfif?url";
-import humanoidRobotImage from "./images/Humnoid robot.jfif?url";
-import weatherStationImage from "./images/iot weather station.jfif?url";
-import rcPlaneImage from "./images/RC plane.jfif?url";
-import smartDustbinImage from "./images/smart dustbin.jfif?url";
-import spiderRobotImage from "./images/spider robot.jfif?url";
-import roboticsLabImage from "./images/Robotics Lab.jfif?url";
-import studentRoboticsLabImage from "./images/student robotics lab.jfif?url";
-import advancedRoboticsLabImage from "./images/advanced robotic lab.jfif?url";
-import stemInnovationLabImage from "./images/stem innovation lab.jfif?url";
-import aiLabImage from "./images/AI lab.jfif?url";
-import computerVisionLabImage from "./images/computer vision lab.jfif?url";
-import atalTinkeringLabImage from "./images/atal tinkering lab.jfif?url";
-import iotWorkshopImage from "./images/ai and iot workshop.jfif?url";
-import automationLabImage from "./images/automation lab.jfif?url";
-import electronicsLabImage from "./images/electronic lab.jfif?url";
-import makerSpaceImage from "./images/maker space.jfif?url";
-import scienceProjectImage from "./images/science and engineering project.jfif?url";
-import studentTrainingImage from "./images/student trainning.jfif?url";
-import studentTranningImage from "./images/Student Tranning.jfif?url";
-import teacherTrainingImage from "./images/Teacher Trainning.jfif?url";
-import industry40Image from "./images/Industry 4,0.png?url";
-import additiveManufacturingImage from "./images/Additive maufacturing.png?url";
-import arVrLabImage from "./images/AR &VR virtual lab.png?url";
-import droneTechnologyImage from "./images/Drone Technology.png?url";
-import electricVehicleLabImage from "./images/Electric vehicle lab.png?url";
-import industrialRoboticsImage from "./images/Industrial Robotics.png?url";
-import plcTrainerImage from "./images/PlC trainer kit.png?url";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { authenticateLocalAccount, demoCredentials, registerLocalAccount } from "./data/localAccounts";
+import {
+  getFirebaseIdToken,
+  isFirebaseConfigured,
+  registerWithEmailPassword,
+  signInWithEmailPassword,
+  signInWithSocialProvider,
+  signOutFirebaseUser,
+} from "./data/firebaseAuth";
+import { getDashboardActivity } from "./data/dashboardActivity";
+import { apiUrl } from "./data/api";
+import { academicPaths } from "./data/academic-paths";
 
-const company = "Raj Infotech";
-const companyEmail = "sales@rajinfotechindia.com";
-const contactEmail = "rajeev.bhargava@rajinfotechindia.com";
-const companyPhone = "+91 9829033023";
-const companyAddress =
-  "106-107, Mahima Majesty, Ram Gali No. 6, Raja Park, Jaipur, Rajasthan 302004";
-const companyWebsite = "/";
-const contactPath = "/contact";
+const InterviewExperiencePage = lazy(() => import("./components/InterviewExperience"));
+const SkillAssessmentPage = lazy(() => import("./components/SkillAssessment"));
+const ResumeIntelligence = lazy(() => import("./components/ResumeIntelligence"));
 
-const photos = {
-  classroom: classroomImage,
-  students: studentImage,
-  workshop: workshopImage,
-  electronics: electronicsImage,
-  robotics: roboticsImage,
-  lab: labImage,
-  teamwork: teamworkImage,
-  coding: codingImage,
-  learning: learningImage,
-  engineering: electronicsImage,
-  components: roboticsImage,
-  meeting: classroomImage,
+const SEO_SITE_URL = "https://www.alberotechnologies.in";
+const SEO_PAGES = {
+  "/": {
+    title: "Online Skill Assessments & Career Tools | SkillAI",
+    description: "Assess your skills, explore your strengths, practice AI-powered interviews, and get practical career guidance with SkillAI.",
+  },
+  "/assessment": {
+    title: "AI Skill Assessment Online: Test Your Skills | SkillAI",
+    description: "Take an AI-powered online skill assessment for your subject or career field. Get tailored questions, understand your strengths, and see what to learn next.",
+  },
+  "/interview": {
+    title: "AI Mock Interview Practice for Any Career | SkillAI",
+    description: "Practice role-specific AI mock interviews, improve your answers, and build confidence with realistic interview preparation.",
+  },
+  "/domains": {
+    title: "Explore Career Paths and Skills by Field | SkillAI",
+    description: "Explore career paths and in-demand skills across engineering, business, healthcare, science, design, and more.",
+  },
+  "/research": {
+    title: "Find Research Papers for Your Field of Study | SkillAI",
+    description: "Discover scholarly research by academic field, course, keyword, and publication year with SkillAI Research.",
+  },
+  "/research/maker": {
+    title: "Research Idea and Outline Maker | SkillAI",
+    description: "Turn a research topic into a focused question and a clear outline to help organize your next academic project.",
+  },
+  "/roadmap": {
+    title: "Build a Practical Career Roadmap | SkillAI",
+    description: "Connect your current skills to career goals and create practical next steps with a personalized career roadmap.",
+  },
+  "/resources": {
+    title: "Career and Skill-Building Resources | SkillAI",
+    description: "Explore practical resources for career planning, communication, interviews, portfolios, and continuous skill development.",
+  },
+  "/pricing": {
+    title: "Plans and Pricing for SkillAI",
+    description: "Compare SkillAI plans for AI interview practice and online skill assessments. Choose the option that fits your goals.",
+  },
 };
 
-const imageUrl = (source) => source;
+function getSeoPage(pathname) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (SEO_PAGES[path]) return { ...SEO_PAGES[path], indexable: true, path };
 
-const projectList = [
-  {
-    slug: "ai-object-detection",
-    title: "AI Object Detection",
-    category: "AI",
-    image: aiObjectDetectionImage,
-    description:
-      "Explore how computer vision models identify objects in images and live camera frames.",
-    technology: "Python · Computer vision · Camera",
-  },
-  {
-    slug: "bluetooth-controlled-car",
-    title: "Bluetooth Controlled Car",
-    category: "Robotics",
-    image: bluetoothCarImage,
-    description:
-      "Build and control a small vehicle over a wireless connection, from chassis assembly to app control.",
-    technology: "Arduino · Bluetooth · Motor driver",
-  },
-  {
-    slug: "fire-detection-system",
-    title: "Fire Detection System",
-    category: "Electronics",
-    image: fireDetectionImage,
-    description:
-      "Prototype a sensor-based alert system and learn how inputs can trigger a safety response.",
-    technology: "Microcontroller · Flame sensor · Buzzer",
-  },
-  {
-    slug: "dog-robot",
-    title: "Dog Robot",
-    category: "Robotics",
-    image: dogRobotImage,
-    description:
-      "Explore robotic movement and balance by building a four-legged robot with coordinated actuators.",
-    technology: "Microcontroller · Servos · Robotics",
-  },
-  {
-    slug: "drone",
-    title: "Drone",
-    category: "Robotics",
-    image: droneTechnologyImage,
-    description:
-      "Learn how flight, sensors and control systems work together in a programmable drone.",
-    technology: "Flight controller · Sensors · Programming",
-  },
-  {
-    slug: "humanoid-robot",
-    title: "Humanoid Robot",
-    category: "Robotics",
-    image: humanoidRobotImage,
-    description:
-      "An introduction to coordinated movement, actuators and the challenges of human-inspired machines.",
-    technology: "Robotics kit · Servos · Programming",
-  },
-  {
-    slug: "spider-robot",
-    title: "Spider Robot",
-    category: "Robotics",
-    image: spiderRobotImage,
-    description:
-      "Investigate multi-leg movement and mechanical coordination with a small walking robot.",
-    technology: "Microcontroller · Servos · Leg mechanisms",
-  },
-  {
-    slug: "iot-weather-station",
-    title: "IoT Weather Station",
-    category: "IoT",
-    image: weatherStationImage,
-    description:
-      "Collect local environmental readings and send them to a dashboard for observation over time.",
-    technology: "ESP32 · Environmental sensors · MQTT",
-  },
-  {
-    slug: "rc-plane",
-    title: "RC Plane",
-    category: "Robotics",
-    image: rcPlaneImage,
-    description:
-      "Explore flight principles, radio control and the parts that bring a model aircraft to life.",
-    technology: "Radio control · Servos · Aerodynamics",
-  },
-  {
-    slug: "smart-dustbin",
-    title: "Smart Dustbin",
-    category: "Electronics",
-    image: smartDustbinImage,
-    description:
-      "Combine proximity sensing and a small actuator to create a touch-free lid mechanism.",
-    technology: "Arduino · Ultrasonic sensor · Servo",
-  },
-];
-
-const galleryItems = [
-  {
-    image: photos.classroom,
-    title: "A collaborative classroom",
-    category: "Students",
-  },
-  {
-    image: photos.electronics,
-    title: "Electronics in practice",
-    category: "Equipment",
-  },
-  { image: photos.workshop, title: "Learning together", category: "Training" },
-  {
-    image: photos.robotics,
-    title: "Robotics workshop",
-    category: "Robotics Labs",
-  },
-  { image: photos.lab, title: "Building and testing", category: "Projects" },
-  { image: photos.teamwork, title: "A team at work", category: "Students" },
-  {
-    image: photos.coding,
-    title: "Programming in the lab",
-    category: "STEM Labs",
-  },
-  { image: photos.learning, title: "Learning by doing", category: "Training" },
-  {
-    image: photos.engineering,
-    title: "An engineering project",
-    category: "Projects",
-  },
-  {
-    image: photos.components,
-    title: "Components and circuits",
-    category: "Equipment",
-  },
-  { image: photos.meeting, title: "Ideas take shape", category: "STEM Labs" },
-  {
-    image: photos.students,
-    title: "Shared discovery",
-    category: "Robotics Labs",
-  },
-];
-
-const vguLogo = new URL("./education/vgv.png", import.meta.url).href;
-const educationPartners = [
-  new URL("./education/CL1.png", import.meta.url).href,
-  new URL("./education/CL2.png", import.meta.url).href,
-  new URL("./education/CL3.png", import.meta.url).href,
-  new URL("./education/CL4.png", import.meta.url).href,
-  new URL("./education/Edt1.png", import.meta.url).href,
-  new URL("./education/Edt2.png", import.meta.url).href,
-  new URL("./education/Edt3.png", import.meta.url).href,
-  new URL("./education/Edt4.png", import.meta.url).href,
-  new URL("./education/Edt5.png", import.meta.url).href,
-  vguLogo,
-];
-const softwarePartners = [
-  new URL("./collaboration/Cb1.png", import.meta.url).href,
-  new URL("./collaboration/Cb2.png", import.meta.url).href,
-  new URL("./collaboration/Cb4.png", import.meta.url).href,
-  new URL("./collaboration/Cb5.png", import.meta.url).href,
-  new URL("./collaboration/Cb6.png", import.meta.url).href,
-  new URL("./collaboration/Cb7.png", import.meta.url).href,
-];
-
-const navigation = [
-  { label: "Home", to: "/" },
-  { label: "About Us", to: "/about" },
-  {
-    label: "Robotics Labs",
-    to: "/robotics-labs",
-    children: [
-      ["School Robotics Lab", "/robotics-labs#school-lab"],
-      ["Advanced Robotics Lab", "/robotics-labs#advanced-lab"],
-      ["Robotics Equipment", "/robotics-labs#equipment"],
-      ["Robotics Projects", "/projects"],
-    ],
-  },
-  {
-    label: "STEM Labs",
-    to: "/stem-labs",
-    children: [
-      ["STEM Innovation Lab", "/stem-labs#innovation-lab"],
-      ["Electronics Lab", "/stem-labs#electronics-lab"],
-      ["Atal Tinkering Lab", "/stem-labs#atal-lab"],
-      ["STEM Activities", "/stem-labs#activities"],
-    ],
-  },
-  {
-    label: "AI & IoT",
-    to: "/ai-iot",
-    children: [
-      ["AI Lab", "/ai-iot#ai-lab"],
-      ["IoT Lab", "/ai-iot#iot-lab"],
-      ["Computer Vision", "/ai-iot#computer-vision"],
-      ["Automation Lab", "/ai-iot#automation-lab"],
-    ],
-  },
-  { label: "Software Solutions", to: "/software-solutions" },
-  { label: "Projects", to: "/projects" },
-  {
-    label: "Training",
-    to: "/training",
-    children: [
-      ["Student Training", "/training#student-training"],
-      ["Teacher Training", "/training#teacher-training"],
-      ["Robotics Workshops", "/training#workshops"],
-      ["AI & IoT Training", "/training#workshops"],
-    ],
-  },
-  { label: "Career", to: "/career" },
-  { label: "Contact", to: "/contact" },
-];
-
-function Brand() {
-  return (
-    <Link to="/" className="brand" aria-label={`${company} home`}>
-      <span className="brand-mark">
-        <img src={aitechnoLogo} alt="" />
-      </span>
-      <span className="brand-name">
-        Raj Infotech<span>Robotics & STEM lab solutions</span>
-      </span>
-    </Link>
-  );
+  const privatePage = ["/login", "/register", "/dashboard", "/interview/start", "/assessment/start"]
+    .includes(path) || path === "/resume" || path.startsWith("/resume/");
+  return {
+    title: privatePage ? "Your SkillAI Workspace" : "Page Not Found | SkillAI",
+    description: "SkillAI helps learners assess skills and plan practical next steps.",
+    indexable: false,
+    path,
+  };
 }
 
-function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [openGroup, setOpenGroup] = useState("");
-  const [scrolled, setScrolled] = useState(false);
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem("raj-infotech-theme") || "light",
-  );
+const navItems = [
+  { label: "Home", to: "/" },
+  {
+    label: "Interview",
+    children: [
+      { label: "AI Interview", to: "/interview" },
+      { label: "Skill Assessment", to: "/assessment" },
+    ],
+  },
+  {
+    label: "Research",
+    children: [
+      { label: "Research Papers", to: "/research" },
+      { label: "Research Maker", to: "/research/maker" },
+    ],
+  },
+  {
+    label: "Resume",
+    groups: [
+      { heading: "RESUME", items: [
+        { label: "Resume Dashboard", to: "/resume/dashboard", description: "Your resume signals in one place.", icon: BarChart3 },
+        { label: "Resume Analyzer", to: "/resume/analyzer", description: "Review text extracted from your resume.", icon: FileText },
+        { label: "Resume Builder", to: "/resume/builder", description: "Build a clear, single-column resume.", icon: Layers3 },
+      ] },
+      { heading: "OPTIMIZATION", items: [
+        { label: "Job Description Match", to: "/resume/optimizer", description: "Compare exact skill terms with a job.", icon: Target },
+        { label: "Job Match", to: "/resume/job-match", description: "Explore role fit from your skills.", icon: BriefcaseBusiness },
+        { label: "Resume Tailor", to: "/resume/tailor", description: "Focus relevant sections for a role.", icon: Sparkles },
+      ] },
+      { heading: "CAREER INTELLIGENCE", items: [
+        { label: "Skill Gap Analysis", to: "/resume/skill-gaps", description: "Compare skills with target roles.", icon: GraduationCap },
+        { label: "Project Analyzer", to: "/resume/project-analyzer", description: "Strengthen real project evidence.", icon: FolderKanban },
+        { label: "Career Profile", to: "/resume/profile", description: "Your reusable professional identity.", icon: UserRound },
+      ] },
+      { heading: "MANAGEMENT", items: [
+        { label: "Resume Versions", to: "/resume/versions", description: "Save and manage resume snapshots.", icon: FileText },
+        { label: "Career Package", to: "/resume/package", description: "Draft career materials from your profile.", icon: BriefcaseBusiness },
+      ] },
+    ],
+  },
+  { label: "Resources", to: "/resources" },
+  { label: "Pricing", to: "/pricing" },
+];
+
+const workflowSteps = [
+  { number: "01", title: "Choose your direction", copy: "Tell us what you study, what you are good at, and where you would like to go next.", icon: UserRound },
+  { number: "02", title: "Understand your strengths", copy: "Turn your coursework, projects, experience, and interests into a clear skills picture.", icon: BarChart3 },
+  { number: "03", title: "Practice with purpose", copy: "Prepare for interviews, assessments, and real conversations in your chosen field.", icon: ShieldCheck },
+  { number: "04", title: "Explore what is possible", copy: "Discover career options, useful learning resources, and ideas from research.", icon: BookOpenText },
+  { number: "05", title: "Take your next step", copy: "Follow a practical roadmap that fits your goals, experience, and pace.", icon: TrendingUp },
+];
+
+const ASSESSMENT_FAQS = [
+  {
+    question: "What is an AI skill assessment?",
+    answer: "An AI skill assessment gives you questions based on your selected subject or field, then summarizes your responses with practical learning suggestions. It is for practice and self-improvement, not a certified qualification or hiring decision.",
+  },
+  {
+    question: "Can I take a free online skill assessment?",
+    answer: "The Free plan includes one lifetime AI practice start shared between skill assessments and interview practice. See the SkillAI pricing page for current plan limits.",
+  },
+  {
+    question: "What skills can an online assessment test?",
+    answer: "Choose from the available branch, course, and domain options. The assessment focuses on the selected academic or professional area, and available topics can vary by branch.",
+  },
+  {
+    question: "How should I use my skill assessment results?",
+    answer: "Review the learning summary to identify topics to practice next. Treat AI-generated feedback as guidance, and verify important academic or career decisions with a qualified instructor or advisor.",
+  },
+];
+
+const domainCards = [
+  { icon: Layers3, name: "Engineering & Technology", description: "Explore pathways across mechanical, civil, electrical, computer, and emerging technologies.", skills: "Projects & practical skills", interview: "Role preparation", research: "Career pathways" },
+  { icon: BriefcaseBusiness, name: "Business & Finance", description: "Build capability in management, accounting, entrepreneurship, economics, and finance.", skills: "Business capability", interview: "Interview practice", research: "Career pathways" },
+  { icon: GraduationCap, name: "Healthcare & Life Sciences", description: "Prepare for opportunities in healthcare, biotechnology, pharmacy, and life sciences.", skills: "Applied knowledge", interview: "Role preparation", research: "Career pathways" },
+  { icon: BrainCircuit, name: "Science & Research", description: "Strengthen scientific thinking, research skills, communication, and academic readiness.", skills: "Research skills", interview: "Presentation practice", research: "Research Hub" },
+  { icon: Sparkles, name: "Design & Creative Arts", description: "Showcase creative work and grow skills in design, media, communication, and the arts.", skills: "Portfolio building", interview: "Creative practice", research: "Career pathways" },
+  { icon: ShieldCheck, name: "Law & Public Service", description: "Develop clear communication, critical analysis, and preparation for public-facing careers.", skills: "Core competencies", interview: "Scenario practice", research: "Career pathways" },
+  { icon: Database, name: "Agriculture & Environment", description: "Explore modern agriculture, sustainability, environmental science, and field innovation.", skills: "Practical capability", interview: "Role preparation", research: "Career pathways" },
+  { icon: BookOpenText, name: "Education & Humanities", description: "Connect your strengths in teaching, languages, history, policy, and social sciences to work.", skills: "Transferable skills", interview: "Communication practice", research: "Career pathways" },
+];
+
+const resumeCapabilities = [
+  { label: "01 · Upload", value: "Extract document text" },
+  { label: "02 · Review", value: "Check the source against extraction" },
+  { label: "03 · Compare", value: "Find shared role and job terms" },
+  { label: "04 · Build", value: "Edit and export your resume" },
+];
+
+const interviewModes = ["Role-specific", "Behavioral", "Portfolio Review", "Case Discussion", "Presentation", "Situational", "Project Viva", "Mixed Practice"];
+
+const competencyBreakdown = [
+  { label: "Field Knowledge", value: 82 },
+  { label: "Problem Solving", value: 76 },
+  { label: "Communication", value: 88 },
+  { label: "Practical Experience", value: 91 },
+  { label: "Confidence", value: 72 },
+];
+
+const researchCards = [
+  { title: "Designing more accessible services for diverse communities", authors: "Interdisciplinary perspectives · Public services", year: 2026, venue: "Accessibility & Society", citations: 42, open: "Open Access" },
+  { title: "Sustainable materials and resilient cities", authors: "Built environment · Climate research", year: 2025, venue: "Sustainability Review", citations: 28, open: "AI Summary Available" },
+  { title: "Improving communication in community healthcare", authors: "Health practice · Human-centered research", year: 2024, venue: "Health & Society", citations: 67, open: "Journal" },
+];
+
+const resourceCards = [
+  { category: "Career Skills", level: "All levels", title: "Explain your experience with clarity and confidence" },
+  { category: "Portfolio", level: "Practical guide", title: "Showcase projects, placements, and hands-on work" },
+  { category: "Communication", level: "All levels", title: "Prepare for interviews across different industries" },
+  { category: "Research", level: "Step-by-step", title: "Find reliable sources and build a strong research question" },
+];
+
+const weakPoints = [
+  { skill: "Communicating your experience", current: "Developing", target: "Confident", evidence: "Some examples could better explain your contribution and outcome.", suggest: "Practice telling concise stories about your work and learning." },
+  { skill: "Connecting skills to goals", current: "Developing", target: "Confident", evidence: "Your profile has strengths that are not yet clearly linked to target roles.", suggest: "Compare role requirements with your coursework and experience." },
+  { skill: "Planning your next steps", current: "Developing", target: "Confident", evidence: "A few growth areas could use clearer priorities.", suggest: "Choose one practical skill or project to focus on next." },
+];
+
+function Navbar({ user, onLogout }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [theme, setTheme] = useState(() => (
+    window.localStorage.getItem("skillai-theme") === "dark" ? "dark" : "light"
+  ));
   const location = useLocation();
 
   useEffect(() => {
-    setMobileOpen(false);
-    setOpenGroup("");
+    setMenuOpen(false);
+    setOpenDropdown(null);
   }, [location.pathname]);
 
   useEffect(() => {
-    const update = () => setScrolled(window.scrollY > 8);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
-  }, []);
-
-  useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem("raj-infotech-theme", theme);
+    window.localStorage.setItem("skillai-theme", theme);
   }, [theme]);
 
+  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
+  const themeLabel = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+
   return (
-    <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
-      <div className="header-inner">
-        <Brand />
+    <header className="site-header">
+      <div className="wrap header-inner">
+        <Link to="/" className="brand" aria-label="SkillAI home">
+          <span className="brand-mark" aria-hidden="true"><Sparkles size={20} strokeWidth={2.1} /></span>
+          <span className="brand-text">
+            <strong>SkillAI</strong>
+          </span>
+        </Link>
+
         <button
-          className="mobile-toggle icon-button"
           type="button"
-          aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen(!mobileOpen)}
+          className="icon-button theme-toggle mobile-theme-toggle"
+          onClick={toggleTheme}
+          aria-label={themeLabel}
+          aria-pressed={theme === "dark"}
+          title={themeLabel}
         >
-          {mobileOpen ? <X size={23} /> : <Menu size={23} />}
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <nav
-          className={`main-nav${mobileOpen ? " mobile-open" : ""}`}
-          aria-label="Main navigation"
+
+        <button
+          type="button"
+          className="mobile-toggle"
+          onClick={() => setMenuOpen((value) => !value)}
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+
+        <nav className={`main-nav${menuOpen ? " open" : ""}`} aria-label="Main navigation">
           <div className="nav-links">
-            {navigation.map((item) =>
-              item.children ? (
-                <div
-                  className={`nav-group${openGroup === item.label ? " group-open" : ""}`}
-                  key={item.label}
-                >
-                  <div className="nav-group-top">
-                    <NavLink
-                      to={item.to}
-                      className={({ isActive }) =>
-                        `nav-link${isActive ? " active" : ""}`
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                    <button
-                      className="nav-expand icon-button"
-                      type="button"
-                      aria-label={`Show ${item.label} menu`}
-                      aria-expanded={openGroup === item.label}
-                      onClick={() =>
-                        setOpenGroup(openGroup === item.label ? "" : item.label)
-                      }
-                    >
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-                  <div className="dropdown-menu">
-                    {item.children.map(([label, to]) => (
-                      <Link key={label} to={to}>
-                        {label}
-                        <ArrowUpRight size={14} />
-                      </Link>
-                    ))}
-                  </div>
+            {navItems.map((item) => item.children || item.groups ? (
+              <div key={item.label} className={`nav-dropdown${openDropdown === item.label ? " open" : ""}`}>
+                <div className="nav-dropdown-trigger">
+                  <button
+                    type="button"
+                    className={`nav-dropdown-heading${(item.children || item.groups.flatMap((group) => group.items)).some((child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)) ? " active" : ""}`}
+                    aria-expanded={openDropdown === item.label}
+                    aria-controls={`${item.label.toLowerCase()}-nav-menu`}
+                    onClick={() => setOpenDropdown((open) => open === item.label ? null : item.label)}
+                  >
+                    {item.label}
+                    <ChevronDown size={14} aria-hidden="true" />
+                  </button>
                 </div>
-              ) : (
-                <NavLink
-                  key={item.label}
-                  to={item.to}
-                  end={item.to === "/"}
-                  className={({ isActive }) =>
-                    `nav-link${isActive ? " active" : ""}`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ),
+                {item.groups ? (
+                  <div id={`${item.label.toLowerCase()}-nav-menu`} className="nav-dropdown-menu nav-mega-menu">
+                    {item.groups.map((group) => <section className="nav-mega-group" key={group.heading}>
+                      <span>{group.heading}</span>
+                      {group.items.map(({ icon: Icon, ...child }) => <NavLink key={child.to} to={child.to} className="nav-mega-link"><i><Icon size={17} /></i><span><strong>{child.label}</strong><small>{child.description}</small></span><ArrowRight size={14} /></NavLink>)}
+                    </section>)}
+                  </div>
+                ) : (
+                  <div id={`${item.label.toLowerCase()}-nav-menu`} className="nav-dropdown-menu">
+                    {item.children.map((child) => <NavLink key={child.to} to={child.to} className="nav-dropdown-link">{child.label}</NavLink>)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="nav-tools">
+            <button type="button" className="icon-button" aria-label="Notifications">
+              <Bell size={18} />
+            </button>
+            <button
+              type="button"
+              className="icon-button theme-toggle desktop-theme-toggle"
+              onClick={toggleTheme}
+              aria-label={themeLabel}
+              aria-pressed={theme === "dark"}
+              title={themeLabel}
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <span className="nav-divider" aria-hidden="true" />
+            {user ? (
+              <>
+                <Link to="/dashboard" className="user-pill" aria-label={`Open ${user.name}'s dashboard`}>{user.name}</Link>
+                <button type="button" className="nav-login" onClick={onLogout}>Logout</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="nav-login">Login</Link>
+                <Link to="/register" className="primary-button small">Get Started</Link>
+              </>
             )}
           </div>
-          <button
-            className="theme-toggle icon-button"
-            type="button"
-            aria-label={
-              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-            }
-            aria-pressed={theme === "dark"}
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <Link className="button button-small header-cta" to={contactPath}>
-            Request a Lab Proposal
-            <ArrowUpRight size={15} />
-          </Link>
         </nav>
       </div>
+
+      {menuOpen && (
+        <div className="mobile-menu">
+          {navItems.map((item) => item.children || item.groups ? (
+            <div key={item.label} className={`mobile-nav-dropdown${openDropdown === item.label ? " open" : ""}`}>
+              <div className="mobile-nav-dropdown-trigger">
+                <button
+                  type="button"
+                  className={`mobile-nav-dropdown-heading${(item.children || item.groups.flatMap((group) => group.items)).some((child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)) ? " active" : ""}`}
+                  aria-expanded={openDropdown === item.label}
+                  aria-controls={`mobile-${item.label.toLowerCase()}-nav-menu`}
+                  onClick={() => setOpenDropdown((open) => open === item.label ? null : item.label)}
+                >
+                  {item.label}
+                  <ChevronDown size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div id={`mobile-${item.label.toLowerCase()}-nav-menu`} className={`mobile-nav-submenu${openDropdown === item.label ? " open" : ""}`}>
+                {item.groups ? item.groups.flatMap((group) => group.items).map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}><span>{child.label}<small>{child.description}</small></span></NavLink>) : item.children.map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>{child.label}</NavLink>)}
+              </div>
+            </div>
+          ) : (
+            <NavLink key={item.label} to={item.to} end={item.to === "/"} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>
+              {item.label}
+            </NavLink>
+          ))}
+          <div className="mobile-actions">
+            {user ? (
+              <>
+                <span className="mobile-user-name">Hi, {user.name}</span>
+                <Link to="/dashboard" className="secondary-button small">Dashboard</Link>
+                <button type="button" className="primary-button small" onClick={onLogout}>Logout</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="nav-login">Login</Link>
+                <Link to="/register" className="primary-button small">Get Started</Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
 
-function Footer() {
+function SectionHeading({ eyebrow, title, description }) {
   return (
-    <footer className="site-footer">
-      <div className="footer-main wrap">
-        <div className="footer-about">
-          <Brand />
-          <p>
-            Jaipur-based technology company specialising in robotics lab setups,
-            automation and innovative IT solutions.
-          </p>
-          <a
-            className="footer-note"
-            href={companyWebsite}
-            target={companyWebsite.startsWith("http") ? "_blank" : undefined}
-            rel={companyWebsite.startsWith("http") ? "noreferrer" : undefined}
-          >
-            Visit our website ↗
-          </a>
-          <div className="footer-contact">
-            <a href={`tel:${companyPhone.replaceAll(" ", "")}`}>
-              {companyPhone}
-            </a>
-            <a href={`mailto:${companyEmail}`}>{companyEmail}</a>
-          </div>
-        </div>
-        <div className="footer-column">
-          <h3>Company</h3>
-          <Link to="/">Home</Link>
-          <Link to="/about">About us</Link>
-          <Link to="/projects">Projects</Link>
-          <Link to="/career">Career</Link>
-          <Link to="/contact">Contact</Link>
-        </div>
-        <div className="footer-column">
-          <h3>Solutions</h3>
-          <Link to="/robotics-labs">Robotics labs</Link>
-          <Link to="/stem-labs">STEM labs</Link>
-          <Link to="/ai-iot">AI & IoT</Link>
-          <Link to="/software-solutions">Software solutions</Link>
-          <Link to="/ai-iot#automation-lab">Automation</Link>
-          <Link to="/stem-labs#electronics-lab">Electronics</Link>
-        </div>
-        <div className="footer-column">
-          <h3>Learning</h3>
-          <Link to="/training#student-training">Student training</Link>
-          <Link to="/training#teacher-training">Teacher training</Link>
-          <Link to="/training#workshops">Workshops</Link>
-          <Link to="/projects">Project training</Link>
-          <span className="social-note">Jaipur, Rajasthan</span>
-        </div>
-      </div>
-      <div className="footer-bottom wrap">
-        <span>© 2026 {company}. All rights reserved.</span>
-        <span className="legal-note">Privacy policy · Terms & conditions</span>
-        <span className="footer-india">
-          Jaipur, India <span>·</span> <a href="#top">Back to top ↑</a>
-        </span>
-      </div>
-    </footer>
-  );
-}
-
-function Photo({ name, alt, className = "", width = 1000, eager = false }) {
-  return (
-    <img
-      className={className}
-      src={name.startsWith("https://") ? name : imageUrl(name, width)}
-      alt={alt}
-      loading={eager ? "eager" : "lazy"}
-    />
-  );
-}
-
-function PageHeading({ eyebrow, title, description, align = "left" }) {
-  return (
-    <div className={`page-heading page-heading-${align}`}>
+    <div className="section-heading">
       <span className="eyebrow">{eyebrow}</span>
-      <h1>{title}</h1>
+      <h2>{title}</h2>
       {description && <p>{description}</p>}
     </div>
   );
 }
 
-function SectionHeading({ eyebrow, title, description, link, to }) {
-  return (
-    <div className="section-heading">
-      <div>
-        <span className="eyebrow">{eyebrow}</span>
-        <h2>{title}</h2>
-        {description && <p>{description}</p>}
-      </div>
-      {link && (
-        <Link className="text-link" to={to}>
-          {link}
-          <ArrowRight size={16} />
-        </Link>
-      )}
-    </div>
-  );
-}
-
-function CTASection({
-  title = "Planning a robotics or STEM lab?",
-  copy = "Tell us about your institution and learning goals. We’ll help you shape a practical next step.",
-  button = "Request a Lab Proposal",
-}) {
-  return (
-    <section className="cta-section wrap">
-      <div className="cta-copy">
-        <span className="eyebrow eyebrow-light">LET’S MAKE SOMETHING</span>
-        <h2>{title}</h2>
-        <p>{copy}</p>
-      </div>
-      <Link className="button button-light" to={contactPath}>
-        {button}
-        <ArrowUpRight size={17} />
-      </Link>
-      <span className="cta-orbit" aria-hidden="true">
-        <CircuitBoard />
-      </span>
-    </section>
-  );
-}
-
-function PhotoTile({ image, title, tag, to, alt }) {
-  return (
-    <Link to={to} className="photo-tile">
-      <div className="photo-frame">
-        <Photo name={image} alt={alt || title} />
-        <span className="tile-arrow">
-          <ArrowUpRight size={17} />
-        </span>
-      </div>
-      <div className="tile-meta">
-        <span>{tag}</span>
-        <h3>{title}</h3>
-      </div>
-    </Link>
-  );
-}
-
 function HomePage() {
-  const heroSlides = [
-    {
-      image: roboticsLabImage,
-      alt: "Robotics lab models for hands-on learning",
-      title: "Robotics in action",
-      copy: "Models for hands-on learning",
-    },
-    {
-      image: photos.workshop,
-      alt: "Orange and green educational robot kits",
-      title: "Build and code a robot",
-      copy: "Start with a robot, then make it move",
-    },
-    {
-      image: studentRoboticsLabImage,
-      alt: "Students working in a robotics lab",
-      title: "Student robotics lab",
-      copy: "Explore sensors, movement and code",
-    },
-  ];
-  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
-  const [heroPaused, setHeroPaused] = useState(false);
-  const heroSlide = heroSlides[heroSlideIndex];
-  const changeHeroSlide = (direction) => {
-    setHeroSlideIndex(
-      (current) => (current + direction + heroSlides.length) % heroSlides.length,
-    );
-  };
-  useEffect(() => {
-    if (
-      heroPaused ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      setHeroSlideIndex((current) => (current + 1) % heroSlides.length);
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [heroPaused, heroSlides.length]);
-  const benefits = [
-    [
-      "01",
-      "Hands-on learning",
-      "Students learn by building, testing and improving real working models.",
-    ],
-    [
-      "02",
-      "Industry-oriented skills",
-      "Introduce tools and methods used across engineering and technology.",
-    ],
-    [
-      "03",
-      "Project-based education",
-      "Connect classroom concepts to practical, explainable outcomes.",
-    ],
-    [
-      "04",
-      "Future skills",
-      "Encourage computational thinking, collaboration and creative problem-solving.",
-    ],
-    [
-      "05",
-      "STEM integration",
-      "Bring science, technology, engineering and mathematics into one workspace.",
-    ],
-    [
-      "06",
-      "Teacher support",
-      "Give educators project guidance and practical lab training.",
-    ],
-  ];
-  const solutions = [
-    [
-      "Robotics Lab",
-      roboticsLabImage,
-      "Robotics",
-      "/robotics-labs",
-    ],
-    [
-      "STEM Lab",
-      stemInnovationLabImage,
-      "STEM",
-      "/stem-labs",
-    ],
-    ["AI Lab", aiLabImage, "Artificial intelligence", "/ai-iot#ai-lab"],
-    ["IoT Lab", weatherStationImage, "Connected devices", "/ai-iot#iot-lab"],
-    [
-      "Automation Lab",
-      automationLabImage,
-      "Automation",
-      "/ai-iot#automation-lab",
-    ],
-    [
-      "Electronics Lab",
-      electronicsLabImage,
-      "Electronics",
-      "/stem-labs#electronics-lab",
-    ],
-    [
-      "Drone Technology",
-      droneTechnologyImage,
-      "Emerging technology",
-      "/robotics-labs#drone-technology",
-    ],
-    [
-      "Industry 4.0",
-      industry40Image,
-      "Smart industry",
-      "/ai-iot#industry-40",
-    ],
-    [
-      "Additive Manufacturing",
-      additiveManufacturingImage,
-      "3D printing",
-      "/stem-labs#additive-manufacturing",
-    ],
-    [
-      "Electric Vehicle Lab",
-      electricVehicleLabImage,
-      "Electric mobility",
-      "/stem-labs#ev-lab",
-    ],
-    [
-      "AR & VR Virtual Lab",
-      arVrLabImage,
-      "Immersive learning",
-      "/stem-labs#ar-vr-lab",
-    ],
-    [
-      "Industrial Robotics",
-      industrialRoboticsImage,
-      "Industrial automation",
-      "/robotics-labs#industrial-robotics",
-    ],
-    [
-      "PLC Trainer Kit",
-      plcTrainerImage,
-      "Control systems",
-      "/robotics-labs#plc-trainer",
-    ],
-  ];
   return (
-    <main>
-      <section className="home-hero wrap">
+    <main className="page-shell home-page">
+      <section className="hero-section wrap">
         <div className="hero-copy">
-          <span className="eyebrow">
-            <span className="eyebrow-dot" /> JAIPUR-BASED · 28+ YEARS IN TECHNOLOGY
-          </span>
-          <h1>
-            Build the future with a complete <em>Robotics & STEM Lab</em>
-          </h1>
-          <p>
-            End-to-end robotics, STEM, AI, IoT and automation lab solutions for
-            schools, colleges and educational institutions.
-          </p>
-          <div className="hero-actions">
-            <Link className="button" to="/robotics-labs">
-              Explore lab solutions
-              <ArrowRight size={16} />
-            </Link>
-            <Link className="button button-outline" to={contactPath}>
-              Request a lab proposal
-              <ArrowUpRight size={16} />
-            </Link>
+          <span className="eyebrow"><span className="eyebrow-dot" /> ONLINE SKILL ASSESSMENTS</span>
+          <h1>Understand your skills<span>and what to learn next.</span></h1>
+          <p>Take a structured skill assessment, explore your strengths, practice AI-powered interviews, and get practical guidance for your next career step.</p>
+          <div className="cta-row">
+            <Link to="/register" className="primary-button">Start for Free <ArrowRight size={17} /></Link>
+            <Link to="/domains" className="secondary-button">Explore Career Paths <ArrowUpRight size={17} /></Link>
           </div>
-          <div className="hero-trust">
-            <span className="trust-rule" />
-            <span>
-              Designed for schools, colleges, STEM programmes and skill
-              development centres
-            </span>
+          <div className="hero-proof">
+            <span className="proof-line" aria-hidden="true" />
+            <span>One place to prepare, grow, and explore what comes next.</span>
           </div>
         </div>
-        <div
-          className="hero-visual"
-          role="region"
-          aria-label="Robotics and STEM lab photos"
-          aria-roledescription="carousel"
-          onMouseEnter={() => setHeroPaused(true)}
-          onMouseLeave={() => setHeroPaused(false)}
-          onFocusCapture={() => setHeroPaused(true)}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget)) {
-              setHeroPaused(false);
-            }
-          }}
-        >
-          <Photo
-            key={heroSlide.image}
-            name={heroSlide.image}
-            alt={heroSlide.alt}
-            width={1600}
-            eager
-          />
-          <div className="hero-carousel-controls" role="group" aria-label="Carousel controls">
-            <button
-              className="hero-carousel-arrow"
-              type="button"
-              title="Previous image"
-              aria-label="Previous image"
-              onClick={() => changeHeroSlide(-1)}
-            >
-              <ArrowLeft size={15} />
-            </button>
-            {heroSlides.map((slide, index) => (
-              <button
-                className={`hero-carousel-dot ${index === heroSlideIndex ? "is-active" : ""}`}
-                type="button"
-                key={slide.title}
-                title={slide.title}
-                aria-label={`Show image ${index + 1}: ${slide.title}`}
-                aria-pressed={index === heroSlideIndex}
-                onClick={() => setHeroSlideIndex(index)}
-              />
-            ))}
-            <button
-              className="hero-carousel-arrow"
-              type="button"
-              title="Next image"
-              aria-label="Next image"
-              onClick={() => changeHeroSlide(1)}
-            >
-              <ArrowRight size={15} />
-            </button>
-          </div>
-          <div className="hero-image-caption">
-            <span className="caption-mark">
-              <Lightbulb size={19} />
-            </span>
-            <span>
-              <strong>{heroSlide.title}</strong>
-              <small>{heroSlide.copy}</small>
-            </span>
-            <ArrowUpRight size={17} />
-          </div>
-          <span className="hero-index" aria-live="polite">
-            {String(heroSlideIndex + 1).padStart(2, "0")} / {String(heroSlides.length).padStart(2, "0")}
-          </span>
-        </div>
-      </section>
-      <section className="partners-section" aria-labelledby="partners-heading">
-        <div className="wrap">
-          <div className="partners-heading">
-            <span className="eyebrow">IN GOOD COMPANY</span>
-            <h2 id="partners-heading">Education partners</h2>
-          </div>
-          <div className="partners-grid">
-            {educationPartners.map((logo) => (
-              <div className="partner-logo" key={logo}>
-                <img src={logo} alt="" loading="lazy" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section wrap home-why">
-        <SectionHeading
-          eyebrow="WHY A LAB?"
-          title="Make room for the ‘how’ and ‘what if’."
-          description="A well-planned lab gives students the space, tools and support to turn a lesson into something they can test for themselves."
-        />
-        <div className="benefit-grid">
-          {benefits.map(([number, title, copy]) => (
-            <article className="benefit" key={number}>
-              <span className="benefit-number">{number}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="ONE PARTNER, MANY PATHS"
-            title="Complete lab solutions"
-            description="A purposeful learning space starts with the right mix of tools, projects and teacher support."
-            link="Explore all solutions"
-            to="/robotics-labs"
-          />
-          <div className="solution-grid">
-            {solutions.map(([title, image, tag, to]) => (
-              <PhotoTile
-                key={title}
-                title={title}
-                image={image}
-                tag={tag}
-                to={to}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="software-preview wrap">
-        <div className="software-preview-copy">
-          <span className="eyebrow">SOFTWARE SOLUTIONS</span>
-          <h2>Trusted tools, chosen for the work ahead.</h2>
-          <p>
-            Licensed software, technical consultation, training and support for
-            academic and commercial teams.
-          </p>
-          <Link className="text-link" to="/software-solutions">
-            Explore software solutions
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="software-preview-points">
-          <span>Licensed distribution</span>
-          <span>Technical consultation</span>
-          <span>Training & support</span>
-          <span>Academic collaboration</span>
-        </div>
-      </section>
-      <section className="section wrap project-preview">
-        <SectionHeading
-          eyebrow="BUILT BY STUDENTS"
-          title="Projects that make ideas tangible."
-          description="Start with a question, work through the fundamentals, and finish with something you can demonstrate."
-          link="See all projects"
-          to="/projects"
-        />
-        <div className="project-strip">
-          {projectList.slice(0, 7).map((project, index) => (
-            <Link
-              to={`/projects/${project.slug}`}
-              className="project-preview-item"
-              key={project.slug}
-            >
-              <span className="preview-number">0{index + 1}</span>
-              <span>
-                <strong>{project.title}</strong>
-                <small>{project.technology}</small>
-              </span>
-              <ArrowUpRight size={18} />
-            </Link>
-          ))}
-        </div>
-      </section>
-      <section className="process-section">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="FROM FIRST CONVERSATION TO FIRST PROJECT"
-            title="A clear path to a working lab."
-            description="A practical setup process, shaped around the people who will use the space."
-          />
-          <div className="process-steps">
-            {[
-              "Requirement analysis",
-              "Lab planning",
-              "Equipment selection",
-              "Installation",
-              "Curriculum & projects",
-              "Teacher training",
-              "Lab launch",
-            ].map((step, index) => (
-              <div className="process-step" key={step}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{step}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="process-note">
-            <span className="note-icon">
-              <Check size={18} />
-            </span>
-            <p>
-              Scope, equipment and timelines are planned around each
-              institution’s requirements.
-            </p>
-            <Link to="/about" className="text-link">
-              How we work
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-        </div>
-      </section>
-      <section className="section wrap why-us">
-        <div className="why-photo">
-          <Photo
-            name={photos.engineering}
-            alt="Close view of a person working carefully with electronics"
-          />
-          <span>Thoughtful setup. Practical learning.</span>
-        </div>
-        <div className="why-copy">
-          <span className="eyebrow">A PRACTICAL PARTNER</span>
-          <h2>Support beyond the equipment list.</h2>
-          <p>
-            A lab works best when the space, teaching plan and projects fit
-            together. We bring those pieces into one considered setup.
-          </p>
-          <ul className="check-list">
-            <li>
-              <Check size={16} /> Solutions planned around your learners and
-              space
-            </li>
-            <li>
-              <Check size={16} /> Equipment selected for practical classroom use
-            </li>
-            <li>
-              <Check size={16} /> Project-led learning across core technologies
-            </li>
-            <li>
-              <Check size={16} /> Training support for students and teachers
-            </li>
-          </ul>
-          <Link className="text-link" to="/about">
-            Get to know our approach
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
-      <CTASection />
-    </main>
-  );
-}
 
-function AboutPage() {
-  const approach = [
-    [
-      "01",
-      "Plan",
-      "Understand the institution, available space, learner groups and outcomes before recommending a setup.",
-    ],
-    [
-      "02",
-      "Build",
-      "Bring together appropriate equipment, workspaces, curriculum resources and projects.",
-    ],
-    [
-      "03",
-      "Train",
-      "Help students and teachers get comfortable using the equipment through practical sessions.",
-    ],
-    [
-      "04",
-      "Support",
-      "Provide a clear route for follow-up questions as the lab and its projects develop.",
-    ],
-  ];
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="ABOUT RAJ INFOTECH"
-          title="Building smart labs, smarter minds."
-          description="Raj Infotech is a Jaipur-based technology company with 28+ years of experience, specialising in robotic lab setups and innovative IT solutions."
-        />
-      </div>
-      <section className="about-intro wrap">
-        <div className="about-image">
-          <Photo
-            name={photos.teamwork}
-            alt="Colleagues working together around a table"
+        <div className="home-visual">
+          <img
+            src="/all-fields-career.svg"
+            alt="Original illustration of a professional with a career growth dashboard"
           />
-          <span className="image-label">
-            Technology that helps people learn by doing.
-          </span>
-        </div>
-        <div className="about-copy">
-          <span className="eyebrow">WHO WE ARE</span>
-          <h2>Bridging academia and industry.</h2>
-          <p>
-            Raj Infotech, Jaipur is a technical education and industrial
-            innovation organisation focused on connecting academic learning
-            with industry through training and infrastructure.
-          </p>
-          <p>
-            We proudly manufacture educational robots under the Make in India
-            initiative and offer industry-aligned degree programmes in
-            collaboration with universities.
-          </p>
-          <p>
-            Through hands-on infrastructure and advanced training, we help
-            students develop practical skills with technology that prepares
-            them for the work ahead.
-          </p>
-          <Link className="text-link" to="/contact">
-            Talk through your requirements
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
-      <section className="mission-vision-section">
-        <div className="wrap">
-          <div className="mission-vision-layout">
-            <div className="mission-vision-visual">
-              <img
-                src={techLabVisual}
-                alt="Robotics and technology learning environment"
-                loading="lazy"
-              />
-              <div className="mission-years">
-                <strong>28+</strong>
-                <span>years of experience</span>
-              </div>
-            </div>
-            <div className="mission-vision-copy">
-              <article>
-                <span className="eyebrow">OUR VISION</span>
-                <h2>Practical learning for a digital future.</h2>
-                <p>
-                  We aim to empower people and organisations with innovative
-                  training and state-of-the-art AI, IoT, robotics and emerging
-                  technology labs. By connecting theory with practice, we
-                  foster creativity, problem-solving and critical thinking for
-                  the workforce of tomorrow.
-                </p>
-              </article>
-              <article>
-                <span className="eyebrow">OUR MISSION</span>
-                <h2>Help the next generation turn ideas into impact.</h2>
-                <p>
-                  We nurture future technology entrepreneurs with the training,
-                  resources and infrastructure to succeed. Through hands-on
-                  labs, practical programmes and a collaborative ecosystem, we
-                  help people develop ideas into useful solutions.
-                </p>
-              </article>
-            </div>
-          </div>
-          <div className="about-metrics" aria-label="Raj Infotech programme metrics">
-            {[
-              ["Assessment System Integration", 95],
-              ["Hands-on Training & Pilot Sessions", 98],
-              ["Solution", 100],
-            ].map(([label, percentage]) => (
-              <article className="about-metric" key={label}>
-                <div>
-                  <span>{label}</span>
-                  <strong>{percentage}%</strong>
-                </div>
-                <div
-                  className="metric-track"
-                  role="progressbar"
-                  aria-label={label}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow={percentage}
-                >
-                  <span style={{ width: `${percentage}%` }} />
-                </div>
-              </article>
-            ))}
+          <div className="home-visual-caption">
+            <span className="home-caption-mark"><Sparkles size={17} /></span>
+            <span><strong>Your goals, your path</strong><small>Career support for every discipline.</small></span>
           </div>
         </div>
       </section>
-      <section className="approach-section">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="OUR APPROACH"
-            title="Plan. Build. Train. Support."
-            description="A considered process makes it easier to move from a room and an idea to a lab people can use."
-          />
-          <div className="approach-grid">
-            {approach.map(([n, title, copy]) => (
-              <article className="approach-item" key={n}>
-                <span>{n}</span>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="about-audience wrap">
-        <div>
-          <span className="eyebrow">WHO WE SERVE</span>
-          <h2>Built around the institution, not a one-size kit.</h2>
-          <p>
-            School programmes and curriculum requirements differ. So do college
-            labs, community learning spaces and government education
-            initiatives. We support institutions in Jaipur and across Rajasthan,
-            shaping each conversation around the intended learners, equipment
-            needs and teaching plan.
-          </p>
-          <div className="tag-list">
-            <span>CBSE & ICSE schools</span>
-            <span>Jaipur colleges & universities</span>
-            <span>Skill development centres</span>
-            <span>Atal Tinkering Labs</span>
-            <span>STEM innovation centres</span>
-            <span>Education programmes</span>
-          </div>
-        </div>
-        <Photo
-          name={studentTranningImage}
-          alt="Students learning together during a hands-on training session"
-        />
-      </section>
-      <CTASection title="Let’s talk about the learning space you have in mind." />
-    </main>
-  );
-}
 
-function RoboticsPage() {
-  const progression = [
-    "Basic electronics",
-    "Programming",
-    "Sensors",
-    "Robotics",
-    "Automation",
-    "Projects",
-  ];
-  const specialistLabs = [
-    [
-      "drone-technology",
-      "Drone Technology",
-      "Explore unmanned aerial systems, their components and the sensing and control ideas behind them.",
-      studentRoboticsLabImage,
-    ],
-    [
-      "industrial-robotics",
-      "Industrial Robotics",
-      "Introduce industrial robot systems, precision movement and the role of robotics in manufacturing workflows.",
-      advancedRoboticsLabImage,
-    ],
-    [
-      "plc-trainer",
-      "PLC Trainer Kit",
-      "Practise PLC and HMI programming with digital and analogue I/O, and explore Modbus, Ethernet and CANopen communication.",
-      electronicsLabImage,
-    ],
-  ];
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="ROBOTICS LABS"
-          title="Complete robotics lab setup"
-          description="From first circuits to advanced builds, equip students to explore how machines sense, move and respond."
-        />
-      </div>
-      <section className="lab-feature wrap" id="school-lab">
-        <div className="lab-feature-copy">
-          <span className="eyebrow">FOR BEGINNER & INTERMEDIATE LEARNERS</span>
-          <h2>School Robotics Lab</h2>
-          <p>
-            A practical starting point for students learning electronics,
-            programming and the basics of moving machines. Kits and project
-            choices can be matched to learners’ ages and experience.
-          </p>
-          <h3>Equipment categories</h3>
-          <div className="tag-list">
-            <span>Arduino</span>
-            <span>Motors</span>
-            <span>Sensors</span>
-            <span>Servo motors</span>
-            <span>Motor drivers</span>
-            <span>Robot chassis</span>
-            <span>Basic electronics</span>
-          </div>
-          <Link className="text-link" to={contactPath}>
-            Plan a school robotics lab
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <Photo
-          name={studentRoboticsLabImage}
-          alt="Student robotics lab for beginner and intermediate learners"
-        />
-      </section>
-      <section
-        className="lab-feature lab-feature-reverse wrap"
-        id="advanced-lab"
-      >
-        <div className="lab-feature-copy">
-          <span className="eyebrow">FOR ADVANCED LEARNERS & COLLEGES</span>
-          <h2>Advanced Robotics Lab</h2>
-          <p>
-            Extend the fundamentals into connected devices, more capable
-            controllers and automation components for deeper project work.
-          </p>
-          <h3>Equipment categories</h3>
-          <div className="tag-list">
-            <span>Arduino</span>
-            <span>ESP32</span>
-            <span>Robotics kits</span>
-            <span>Sensors</span>
-            <span>Wireless communication</span>
-            <span>Motor drivers</span>
-            <span>Automation components</span>
-          </div>
-          <Link className="text-link" to={contactPath}>
-            Discuss an advanced setup
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <Photo
-          name={advancedRoboticsLabImage}
-          alt="Advanced robotics lab equipment for experienced learners"
-        />
-      </section>
-      <section className="equipment-band" id="equipment">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="THE BUILDING BLOCKS"
-            title="Robotics equipment"
-            description="A useful lab balances core components with the tools needed to assemble, programme and test."
-          />
-          <div className="equipment-grid">
-            {[
-              [
-                "Controllers & kits",
-                "Microcontrollers, beginner kits and development boards",
-                Cpu,
-              ],
-              [
-                "Motion & mechanics",
-                "Motors, servo motors, chassis and mechanical parts",
-                CircuitBoard,
-              ],
-              [
-                "Sensing & control",
-                "Sensor modules, motor drivers and wireless components",
-                FlaskConical,
-              ],
-            ].map(([title, copy, Icon]) => (
-              <article className="equipment-item" key={title}>
-                <Icon size={23} strokeWidth={1.6} />
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="APPLIED ENGINEERING"
-            title="Robotics beyond the classroom basics"
-            description="Extend robotics learning into aerial systems, industrial applications and programmable control."
-          />
-          <div className="solution-grid stem-grid">
-            {specialistLabs.map(([id, title, copy, image]) => (
-              <article className="stem-card" id={id} key={id}>
-                <Photo name={image} alt={title} />
-                <div>
-                  <span className="eyebrow">ROBOTICS & AUTOMATION</span>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section wrap learning-path">
-        <SectionHeading
-          eyebrow="A STEP-BY-STEP LEARNING PATH"
-          title="From components to confident builds."
-          description="Progress concepts in a sequence that helps students understand what each part contributes."
-        />
-        <div className="path-line">
-          {progression.map((step, index) => (
-            <div className="path-step" key={step}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <strong>{step}</strong>
-            </div>
-          ))}
-        </div>
-        <Photo
-          name={roboticsLabImage}
-          alt="Robotics lab models for hands-on learning"
-        />
-      </section>
-      <CTASection
-        title="Ready to plan your robotics lab?"
-        button="Request a Robotics Lab Proposal"
-      />
-    </main>
-  );
-}
-
-function StemPage() {
-  const areas = [
-  [
-      "innovation-lab",
-      "STEM Innovation Lab",
-      "A flexible space for exploring ideas through science, technology, engineering and mathematics.",
-      stemInnovationLabImage,
-    ],
-    [
-      "electronics-lab",
-      "Electronics Lab",
-      "Work with circuits, components, measurement and introductory embedded systems.",
-      electronicsLabImage,
-    ],
-    [
-      "atal-lab",
-      "Atal Tinkering Lab",
-      "Support a hands-on maker environment with tools, project materials and learning activities.",
-      atalTinkeringLabImage,
-    ],
-    [
-      "activities",
-      "Science & Engineering Projects",
-      "Give learners practical ways to investigate a question, prototype a solution and share what they learned.",
-      scienceProjectImage,
-    ],
-    [
-      "maker-space",
-      "Maker Space",
-      "Create room for prototyping, collaboration and iterative problem-solving across disciplines.",
-      makerSpaceImage,
-    ],
-    [
-      "additive-manufacturing",
-      "Additive Manufacturing",
-      "Introduce digital design, rapid prototyping and the layer-by-layer process of 3D printing.",
-      additiveManufacturingImage,
-    ],
-    [
-      "ev-lab",
-      "Electric Vehicle Lab",
-      "Explore electric mobility through learning pathways in battery systems, motors and charging technology.",
-      electricVehicleLabImage,
-    ],
-    [
-      "ar-vr-lab",
-      "AR & VR Virtual Lab",
-      "Create immersive learning experiences and explore the hardware and software behind augmented and virtual reality.",
-      arVrLabImage,
-    ],
-  ];
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="STEM LABS"
-          title="STEM innovation lab setup"
-          description="A flexible space for learners to explore science, technology, engineering and mathematics through practical work."
-        />
-      </div>
-      <section className="stem-lead wrap">
-        <div className="stem-lead-copy">
-          <span className="eyebrow">LEARNING ACROSS DISCIPLINES</span>
-          <h2>One idea can bring four subjects together.</h2>
-          <p>
-            A STEM lab creates a place to ask questions, experiment with
-            materials, make prototypes and learn from the results. Equipment and
-            activities can be selected for the institution’s students, space and
-            programme.
-          </p>
-          <div className="stem-pillars">
-            {[
-              ["S", "Science"],
-              ["T", "Technology"],
-              ["E", "Engineering"],
-              ["M", "Mathematics"],
-            ].map(([letter, label]) => (
-              <div key={letter}>
-                <span>{letter}</span>
-                <strong>{label}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Photo
-          name={photos.learning}
-          alt="Students collaborating in an active learning environment"
-        />
-      </section>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="SPACES FOR MAKING & DISCOVERY"
-            title="A lab shaped around the work."
-            description="Build a dedicated space or combine complementary areas to suit your curriculum and learners."
-          />
-          <div className="solution-grid stem-grid">
-            {areas.map(([id, title, copy, image]) => (
-              <article className="stem-card" id={id} key={id}>
-                <Photo name={image} alt={title} />
-                <div>
-                  <span className="eyebrow">PRACTICAL LEARNING</span>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section wrap stem-outcomes">
-        <div className="stem-outcome-copy">
-          <span className="eyebrow">WHAT STUDENTS PRACTISE</span>
-          <h2>Curiosity, backed by a process.</h2>
-          <p>
-            Learning to frame a question, work with evidence, test a design and
-            improve it is at the heart of a useful maker environment.
-          </p>
-          <Link to={contactPath} className="text-link">
-            Plan your STEM lab
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="outcomes-grid">
-          {[
-            "Innovation",
-            "Problem solving",
-            "Design thinking",
-            "Collaboration",
-            "Scientific inquiry",
-            "Prototyping",
-          ].map((item, index) => (
-            <div key={item}>
-              <span>0{index + 1}</span>
-              <strong>{item}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-      <CTASection
-        title="Plan a STEM lab that fits your learners."
-        button="Plan Your STEM Lab"
-      />
-    </main>
-  );
-}
-
-function AiIotPage() {
-  const labs = [
-    {
-      id: "ai-lab",
-      name: "AI Lab",
-      eyebrow: "ARTIFICIAL INTELLIGENCE",
-      copy: "Introduce students to data, models and responsible experimentation through accessible, project-led AI learning.",
-      topics: ["Python", "Machine learning", "Computer vision", "AI projects"],
-      image: aiLabImage,
-    },
-    {
-      id: "iot-lab",
-      name: "IoT Lab",
-      eyebrow: "CONNECTED DEVICES",
-      copy: "Explore how sensors, microcontrollers and networks connect physical measurements to useful applications.",
-      topics: [
-        "ESP32",
-        "ESP8266",
-        "Sensors",
-        "Cloud connectivity",
-        "MQTT",
-        "Smart devices",
-      ],
-      image: weatherStationImage,
-    },
-    {
-      id: "automation-lab",
-      name: "Automation Lab",
-      eyebrow: "CONTROL & RESPONSE",
-      copy: "Build a foundation in inputs, controllers and outputs through small, observable automation systems.",
-      topics: [
-        "Motors",
-        "Relays",
-        "Sensors",
-        "Controllers",
-        "Automation projects",
-      ],
-      image: automationLabImage,
-    },
-    {
-      id: "computer-vision",
-      name: "Computer Vision",
-      eyebrow: "MACHINES THAT INTERPRET IMAGES",
-      copy: "Use camera systems and image processing to examine how AI applications can classify and detect visual information.",
-      topics: [
-        "Camera systems",
-        "Object detection",
-        "Image processing",
-        "AI applications",
-      ],
-      image: computerVisionLabImage,
-    },
-    {
-      id: "industry-40",
-      name: "Industry 4.0",
-      eyebrow: "CONNECTED INDUSTRY",
-      copy: "Connect robotics, IoT, automation and data concepts to understand the systems behind smart manufacturing.",
-      topics: [
-        "Industrial IoT",
-        "Robotics",
-        "Automation",
-        "Connected systems",
-      ],
-      image: industry40Image,
-    },
-  ];
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="AI & IoT"
-          title="AI, IoT & smart technology labs"
-          description="Help learners connect code, sensors and real-world data through thoughtful technology lab setups."
-        />
-      </div>
-      <section className="ai-overview wrap">
-        <div>
-          <span className="eyebrow">CONNECTED, PRACTICAL LEARNING</span>
-          <h2>Technology makes more sense when students can try it.</h2>
-          <p>
-            AI and IoT learning brings together programming, electronics, data
-            and design. A well-scoped lab helps learners build a strong
-            foundation before moving on to more ambitious applications.
-          </p>
-          <Link className="text-link" to={contactPath}>
-            Discuss your requirements
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="ai-stats">
-          <div>
-            <Cpu size={21} />
-            <strong>Code</strong>
-            <span>Write and adapt</span>
-          </div>
-          <div>
-            <CircuitBoard size={21} />
-            <strong>Connect</strong>
-            <span>Read and respond</span>
-          </div>
-          <div>
-            <Lightbulb size={21} />
-            <strong>Explore</strong>
-            <span>Test an idea</span>
-          </div>
-        </div>
-      </section>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="LEARNING ENVIRONMENTS"
-            title="Four ways into smart technology."
-            description="Choose a focused lab or combine pathways into a connected programme."
-          />
-          <div className="ai-lab-list">
-            {labs.map((lab, index) => (
-              <article
-                className={`ai-lab-row${index % 2 ? " row-reverse" : ""}`}
-                id={lab.id}
-                key={lab.id}
-              >
-                <Photo
-                  name={lab.image}
-                  alt={`${lab.name} learning environment`}
-                />
-                <div>
-                  <span className="eyebrow">{lab.eyebrow}</span>
-                  <h3>{lab.name}</h3>
-                  <p>{lab.copy}</p>
-                  <div className="tag-list">
-                    {lab.topics.map((topic) => (
-                      <span key={topic}>{topic}</span>
-                    ))}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <CTASection
-        title="Let’s shape an AI & IoT learning space."
-        button="Discuss Your AI & IoT Lab"
-      />
-    </main>
-  );
-}
-
-function SoftwareSolutionsPage() {
-  const services = [
-    [
-      "Licensed Software Distribution",
-      "Original, verified and up-to-date software solutions for academic and commercial use.",
-    ],
-    [
-      "Technical Consultation",
-      "Guidance to select, implement and optimise tools around your technical and learning needs.",
-    ],
-    [
-      "Training & Support",
-      "Technical training, onboarding and ongoing support to help teams adopt their software.",
-    ],
-    [
-      "Academic Collaboration",
-      "Software and practical learning support for engineering colleges, universities and training centres.",
-    ],
-  ];
-  const audiences = [
-    "Engineering colleges",
-    "Research institutions",
-    "Design studios",
-    "Manufacturing units",
-    "Government & private enterprises",
-  ];
-
-  return (
-    <main className="inner-page software-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="SOFTWARE SOLUTIONS"
-          title="Technology that works for the people using it."
-          description="Raj Infotech is a value-added authorised channel partner for trusted software providers, connecting academic and commercial clients with software, consulting and support."
-        />
-      </div>
-      <section className="software-intro wrap">
-        <div>
-          <span className="eyebrow">FROM SELECTION TO ADOPTION</span>
-          <h2>Right-fit software, with people behind it.</h2>
-          <p>
-            We help institutions and businesses choose tools for design,
-            engineering, simulation and technical education, then support
-            implementation and adoption with consultation, training and
-            onboarding.
-          </p>
-          <Link className="text-link" to={contactPath}>
-            Discuss your software needs
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="software-promise">
-          <span className="eyebrow">OUR COMMITMENT</span>
-          <p>Original, verified software</p>
-          <p>Practical technical guidance</p>
-          <p>Training and ongoing support</p>
-        </div>
-      </section>
-      <section className="section section-tint software-partners-section">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="OUR ESTEEMED TECHNOLOGY PARTNERS"
-            title="Software from global technology leaders"
-            description="Raj Infotech represents and distributes solutions from the technology partners shown below."
-          />
-          <div className="software-partners-grid">
-            {softwarePartners.map((logo, index) => (
-              <div className="software-partner-logo" key={logo}>
-                <img
-                  src={logo}
-                  alt={`Technology partner ${index + 1}`}
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="section wrap software-services-section">
-        <SectionHeading
-          eyebrow="END-TO-END SOFTWARE SUPPORT"
-          title="A partner beyond the purchase."
-          description="From selecting the right tools to helping people use them with confidence."
-        />
-        <div className="software-service-grid">
-          {services.map(([title, copy], index) => (
-            <article className="software-service" key={title}>
-              <span>0{index + 1}</span>
+      <section className="section wrap home-process-section">
+        <SectionHeading eyebrow="How SkillAI works" title="A clearer path, one step at a time." description="Start with your goals, understand your strengths, and get practical guidance for the next move in your education or career." />
+        <div className="workflow-grid">
+          {workflowSteps.map(({ number, title, copy, icon: Icon }) => (
+            <article key={number} className="workflow-card">
+              <span className="step-number">{number}</span>
+              <div className="step-icon"><Icon size={18} /></div>
               <h3>{title}</h3>
               <p>{copy}</p>
             </article>
           ))}
         </div>
       </section>
-      <section className="software-audience-section">
-        <div className="wrap software-audience-inner">
-          <div>
-            <span className="eyebrow eyebrow-light">WHO WE SUPPORT</span>
-            <h2>Tools for education, research and industry.</h2>
+
+      <section className="section section-soft home-fields-section">
+        <div className="wrap">
+          <SectionHeading eyebrow="Find your field" title="A starting point for every kind of ambition." description="Explore opportunities across industries and disciplines. Your path is personal—and it does not have to look like anyone else’s." />
+          <div className="domain-grid">
+            {domainCards.map(({ icon: Icon, name, description, skills, interview, research }) => (
+              <article key={name} className="domain-card">
+                <div className="domain-head">
+                  <span className="domain-icon"><Icon size={18} /></span>
+                  <button type="button" className="ghost-action">Explore</button>
+                </div>
+                <h3>{name}</h3>
+                <p>{description}</p>
+                <div className="domain-meta">
+                  <span>{skills}</span>
+                  <span>{interview}</span>
+                  <span>{research}</span>
+                </div>
+              </article>
+            ))}
           </div>
-          <div className="software-audience-list">
-            {audiences.map((audience, index) => (
-              <div key={audience}>
-                <span>0{index + 1}</span>
-                <strong>{audience}</strong>
+        </div>
+      </section>
+
+      <section className="section wrap home-path-section">
+        <div className="home-path-visual">
+          <img src="/all-fields-pathways.svg" alt="A professional surrounded by different career pathway cards" />
+        </div>
+        <div className="home-path-copy">
+          <span className="eyebrow">A plan that fits you</span>
+          <h2>Your degree is one part of your story. Your strengths shape the rest.</h2>
+          <p>Connect what you have learned with what you want to do next. SkillAI helps you see the skills you already bring, discover roles you may not have considered, and plan practical next steps.</p>
+          <ul className="home-path-points">
+            <li>See how your current skills transfer to new roles.</li>
+            <li>Practice interviews that match your goals and experience.</li>
+            <li>Get learning recommendations you can act on.</li>
+          </ul>
+          <Link to="/roadmap" className="text-link">Explore career roadmaps <ArrowRight size={16} /></Link>
+        </div>
+      </section>
+
+      <section className="section section-soft home-tools-section">
+        <div className="wrap">
+          <SectionHeading eyebrow="Your toolkit" title="Everything you need for the next step." description="Start wherever you are. Choose a tool that supports the goal you are working toward." />
+          <div className="home-tools-grid">
+            {[
+              { icon: UserRound, title: "Career direction", copy: "Explore roles that connect with your interests and strengths.", to: "/roadmap", link: "Build a roadmap" },
+              { icon: ShieldCheck, title: "Interview practice", copy: "Prepare to explain your experience clearly and confidently.", to: "/interview", link: "Practice interviews" },
+              { icon: BarChart3, title: "Skill assessment", copy: "Understand what you know and choose what to build next.", to: "/assessment", link: "Explore assessments" },
+              { icon: BookOpenText, title: "Learning resources", copy: "Find focused guides, research, and ways to keep growing.", to: "/resources", link: "Browse resources" },
+            ].map(({ icon: Icon, title, copy, to, link }) => (
+              <article key={title} className="home-tool-card">
+                <span className="home-tool-icon"><Icon size={20} /></span>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+                <Link to={to} className="text-link">{link} <ArrowRight size={15} /></Link>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section wrap home-interview-section">
+        <div className="home-interview-copy">
+          <span className="eyebrow">Prepare for real opportunities</span>
+          <h2>Show what you can do—not just what you studied.</h2>
+          <p>Practice the conversations that matter in your field, from explaining a design portfolio or lab project to discussing a business case, clinical scenario, or engineering challenge.</p>
+          <div className="home-example-tags">
+            {["Portfolio review", "Case discussion", "Project presentation", "Role-specific questions"].map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
+          <Link to="/interview" className="text-link">Explore interview practice <ArrowRight size={16} /></Link>
+        </div>
+        <div className="home-interview-visual">
+          <img src="/career-interview.svg" alt="Professional preparing for a career interview" />
+          <div className="home-image-note">
+            <span className="status-pill"><span className="dot" /> Practice at your pace</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="section wrap home-steps-section">
+        <SectionHeading eyebrow="Your next chapter" title="Small steps can open up new possibilities." description="You do not need to have everything figured out. Start with what you know, then keep moving forward." />
+        <div className="home-next-grid">
+          <article><span>01</span><h3>Start with your strengths</h3><p>Bring your studies, work, projects, and interests together in one place.</p></article>
+          <article><span>02</span><h3>Explore what fits</h3><p>Compare career directions and understand the skills each path needs.</p></article>
+          <article><span>03</span><h3>Build at your pace</h3><p>Practice, learn, and create evidence of your progress over time.</p></article>
+        </div>
+      </section>
+
+      <section className="section wrap home-legacy-section">
+        <div className="resume-layout">
+          <div className="resume-preview">
+            <div className="resume-header">
+              <div><span className="eyebrow">RESUME WORKSPACE</span><h3>Your content. Your review.</h3></div>
+              <span className="score-tag">Local</span>
+            </div>
+            <div className="resume-body">
+              <div className="resume-block big"><span>01 · Start</span><strong>Upload your own resume</strong></div>
+              <div className="resume-block"><span>02 · Inspect</span><strong>Review extracted text</strong></div>
+              <div className="resume-block"><span>03 · Compare</span><strong>Check terms against a role</strong></div>
+              <div className="resume-block"><span>04 · Improve</span><strong>Edit only verified details</strong></div>
+            </div>
+          </div>
+
+          <div className="resume-analysis">
+            <SectionHeading eyebrow="Resume workspace" title="Practical tools, with your information in control." description="Review locally extracted resume text, compare exact terms with roles or job descriptions, and create an editable draft. The tools do not invent personal scores or claim a recruiter evaluation." />
+            <div className="metric-grid">
+              {resumeCapabilities.map(({ label, value }) => (
+                <div key={label} className="metric-card">
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="analysis-grid">
+              <div>
+                <h4>What the tools can check</h4>
+                <ul>
+                  <li>Text and common section headings</li>
+                  <li>Terms from the built-in role catalog</li>
+                  <li>Bullet and outcome-number patterns</li>
+                </ul>
+              </div>
+              <div>
+                <h4>What they cannot decide</h4>
+                <ul>
+                  <li>Whether you are qualified or right for a job</li>
+                  <li>Whether a claim is true or independently verified</li>
+                  <li>How an employer or ATS will rank your resume</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-soft home-legacy-section">
+        <div className="wrap interview-layout">
+          <div className="interview-panel">
+            <SectionHeading eyebrow="AI interview experience" title="Dynamic, adaptive, and tailored to the role." description="SkillAI does not behave like a static question bank. It evolves with each answer, checks for evidence, and deepens the discussion based on your real performance." />
+            <div className="mode-pills">
+              {interviewModes.map((mode) => (<span key={mode} className="mode-pill">{mode}</span>))}
+            </div>
+            <div className="conversation-card">
+              <div className="conversation-row"><span className="bubble ai">AI</span><p>“Tell me about the architecture of your project and the trade-offs you considered.”</p></div>
+              <div className="conversation-row user"><span className="bubble user-badge">You</span><p>“I focused on modular design, asynchronous processing, and separate data and inference layers.”</p></div>
+              <div className="conversation-row"><span className="bubble ai">AI</span><p>“Good. Can you explain the bottleneck and how you would scale this under heavier traffic?”</p></div>
+            </div>
+          </div>
+
+          <aside className="panel-side">
+            <div className="panel-header"><strong>Practice feedback</strong><span>Sample</span></div>
+            {competencyBreakdown.map(({ label, value }) => (
+              <div key={label} className="competency-row">
+                <div className="competency-label-row"><span>{label}</span><strong>{value}%</strong></div>
+                <div className="progress-track"><span style={{ width: `${value}%` }} /></div>
+              </div>
+            ))}
+            <div className="timer-box"><TimerReset size={16} /><span>Interview timer</span><strong>23:14</strong></div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="section wrap home-legacy-section">
+        <div className="readiness-grid">
+          <div className="report-card">
+            <SectionHeading eyebrow="Career readiness" title="SkillAI Career Readiness Score" description="A transparent estimate based on interview evidence, resume quality, skills, and active research signals." />
+            <div className="big-score"><strong>78</strong><span>/ 100</span></div>
+            <div className="score-breakdown">
+              <div><span>Field Knowledge</span><strong>84</strong></div>
+              <div><span>Interview Performance</span><strong>76</strong></div>
+              <div><span>Communication</span><strong>72</strong></div>
+              <div><span>Projects</span><strong>81</strong></div>
+              <div><span>Resume</span><strong>88</strong></div>
+              <div><span>Research</span><strong>67</strong></div>
+              <div><span>Problem Solving</span><strong>79</strong></div>
+            </div>
+          </div>
+
+          <div className="weakness-card">
+            <div className="panel-header"><strong>Weakness engine</strong><span>Evidence-based targets</span></div>
+            <div className="weakness-list">
+              {weakPoints.map(({ skill, current, target, evidence, suggest }) => (
+                <div key={skill} className="weakness-item">
+                  <h4>{skill}</h4>
+                  <div className="weakness-meta"><span>Current: {current}</span><span>Target: {target}</span></div>
+                  <p>{evidence}</p>
+                  <small>{suggest}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-soft home-legacy-section">
+        <div className="wrap">
+          <SectionHeading eyebrow="Research hub" title="Discover research. Understand evidence. Build new ideas." description="Explore legitimate scholarly sources, compare findings, and keep your investigation grounded in transparent references." />
+          <div className="research-hero">
+            <div className="research-search"><Search size={18} /><input type="text" value="What do you want to research?" readOnly aria-label="Research prompt" /></div>
+            <div className="search-suggestions"><span>Generative AI in education</span><span>AI-based fraud detection</span><span>LLMs for research workflows</span></div>
+          </div>
+          <div className="paper-grid">
+            {researchCards.map((paper) => (
+              <article key={paper.title} className="paper-card">
+                <div className="paper-head"><span>{paper.year}</span><span>{paper.open}</span></div>
+                <h3>{paper.title}</h3>
+                <p>{paper.authors}</p>
+                <div className="paper-meta"><span>{paper.venue}</span><span>Citations: {paper.citations}</span></div>
+                <div className="paper-actions"><button type="button" className="ghost-action">Read Paper</button><button type="button" className="ghost-action">Ask AI</button></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section wrap home-legacy-section">
+        <div className="roadmap-outer">
+          <SectionHeading eyebrow="Career roadmap" title="Turn ambition into a practical, evidence-backed path." description="SkillAI helps you map your present skills to clear next milestones and target roles." />
+          <div className="roadmap-grid">
+            {[
+              { label: 'Current', title: 'Where you are today', skills: ['Your core knowledge', 'Coursework or training', 'Hands-on experience'], gap: ['Skills to strengthen', 'New areas to explore'], projects: ['A project that shows what you can do'] },
+              { label: 'Next', title: 'A direction to explore', skills: ['Transferable strengths', 'Role-specific knowledge', 'Communication'], gap: ['Experience to build', 'Tools or methods to learn'], projects: ['A practical portfolio or field project'] },
+              { label: 'Target', title: 'The goal you choose', skills: ['Capabilities for your goal', 'Professional practice', 'Continuous learning'], gap: ['Your next milestones', 'Support and experience'], projects: ['Work that demonstrates your growth'] },
+            ].map((step) => (
+              <article key={step.label} className="roadmap-card">
+                <span className="roadmap-label">{step.label}</span>
+                <h3>{step.title}</h3>
+                <div><h4>Required skills</h4><ul>{step.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
+                <div><h4>Skill gap</h4><ul>{step.gap.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
+                <div><h4>Recommended projects</h4><ul>{step.projects.map((project) => <li key={project}>{project}</li>)}</ul></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-soft home-legacy-section">
+        <div className="wrap">
+          <SectionHeading eyebrow="Resources" title="Professional resources, designed for deliberate learning." description="From interview prep to research methodology, build targeted learning loops for the next milestone." />
+          <div className="resource-grid">
+            {resourceCards.map(({ category, level, title }) => (
+              <article key={title} className="resource-card">
+                <div className="resource-topline"><span>{category}</span><span>{level}</span></div>
+                <h3>{title}</h3>
+                <Link to="/resources" className="text-link">View resource <ArrowRight size={15} /></Link>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap cta-panel home-cta-panel">
+        <div><span className="eyebrow eyebrow-light">Your next step starts here</span><h2>Whatever your field, you can build a future that feels like yours.</h2></div>
+        <Link to="/register" className="primary-button light">Start for Free <ArrowUpRight size={18} /></Link>
+      </section>
+    </main>
+  );
+}
+
+function StandardPage({ eyebrow, title, description, illustration, illustrationAlt, startTo = "/register", children }) {
+  return (
+    <main className="page-shell standard-page">
+      <section className="standard-hero wrap">
+        <div className="standard-hero-copy">
+          <span className="eyebrow">{eyebrow}</span>
+          <h1>{title}</h1>
+          <p>{description}</p>
+          <Link to={startTo} className="primary-button">Get started <ArrowRight size={16} /></Link>
+        </div>
+        <div className="standard-hero-art">
+          <img src={illustration} alt={illustrationAlt} />
+        </div>
+      </section>
+
+      <section className="wrap standard-content">
+        {children}
+      </section>
+
+      <section className="standard-next section-soft">
+        <div className="wrap">
+          <SectionHeading eyebrow="A practical next step" title="Make progress that fits your goals." description="Choose one useful action, learn from it, and keep building on what you already know." />
+          <div className="standard-next-grid">
+            <article><span>01</span><h3>Start where you are</h3><p>Bring your current skills, experience, and interests into focus.</p></article>
+            <article><span>02</span><h3>Find what matters next</h3><p>Explore a relevant practice, resource, or pathway for your goals.</p></article>
+            <article><span>03</span><h3>Keep building</h3><p>Turn each step into progress you can see and share with confidence.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap standard-cta cta-panel">
+        <div><span className="eyebrow eyebrow-light">Made for your next chapter</span><h2>Build a path that works for you, whatever your field.</h2></div>
+        <Link to={startTo} className="primary-button light">Get started <ArrowUpRight size={17} /></Link>
+      </section>
+    </main>
+  );
+}
+
+function DomainsPage() {
+  return (
+    <StandardPage eyebrow="Explore your options" title="Discover where your strengths can take you." description="Explore pathways across engineering, business, healthcare, science, design, public service, and more." illustration="/all-fields-pathways.svg" illustrationAlt="A professional surrounded by career pathway options">
+      <div className="domain-grid" style={{ marginTop: 24 }}>
+        {domainCards.map(({ icon: Icon, name, description, skills, interview, research }) => (
+          <article key={name} className="domain-card">
+            <div className="domain-head"><span className="domain-icon"><Icon size={18} /></span><button type="button" className="ghost-action">Explore</button></div>
+            <h3>{name}</h3>
+            <p>{description}</p>
+            <div className="domain-meta"><span>{skills}</span><span>{interview}</span><span>{research}</span></div>
+          </article>
+        ))}
+      </div>
+    </StandardPage>
+  );
+}
+
+function InterviewPage() {
+  const interviewModes = [
+    { label: 'Role-specific', summary: 'Practice the questions and professional conversations common in your field.' },
+    { label: 'Case discussion', summary: 'Work through a realistic scenario and explain how you would respond.' },
+    { label: 'Portfolio review', summary: 'Present projects, placements, research, or practical work with confidence.' },
+    { label: 'Behavioral', summary: 'Prepare clear examples of teamwork, initiative, and problem solving.' },
+  ];
+
+  const deliveryFeatures = [
+    { title: 'Field-aware practice', copy: 'Prepare for conversations that reflect your chosen profession and experience level.' },
+    { title: 'Clear feedback', copy: 'Get guidance on structure, clarity, examples, and professional communication.' },
+    { title: 'Practical evaluation', copy: 'Review how well your responses demonstrate relevant knowledge and transferable skills.' },
+    { title: 'Thoughtful follow-ups', copy: 'Practice explaining your decisions, learning, and contribution in more detail.' },
+  ];
+
+  return (
+    <StandardPage eyebrow="AI Interview" title="Practice interviews that feel real, sharp, and role-specific." description="Move from generic preparation to adaptive simulation built around your background, goals, and weak spots." illustration="/career-interview.svg" illustrationAlt="Professional avatar preparing for an interview" startTo="/interview/start">
+      <div className="interview-layout" style={{ marginTop: 24 }}>
+        <div className="interview-panel">
+          <div className="mode-pills">
+            {['Role-specific', 'Case discussion', 'Portfolio review', 'Behavioral'].map((mode) => (<span key={mode} className="mode-pill">{mode}</span>))}
+          </div>
+          <div className="conversation-card">
+            <div className="conversation-row"><span className="bubble ai">AI</span><p>Tell me about a project or experience that best represents the work you want to do.</p></div>
+            <div className="conversation-row user"><span className="bubble user-badge">You</span><p>I worked with a small team, planned the work around our goals, and used feedback to improve the final result.</p></div>
+            <div className="conversation-row"><span className="bubble ai">AI</span><p>What challenge came up, and how did your contribution help move the work forward?</p></div>
+          </div>
+        </div>
+
+        <aside className="panel-side">
+          <div className="panel-header"><strong>Practice feedback</strong><span>Sample</span></div>
+          <div className="competency-row"><div className="competency-label-row"><span>Relevant knowledge</span><strong>82%</strong></div><div className="progress-track"><span style={{ width: '82%' }} /></div></div>
+          <div className="competency-row"><div className="competency-label-row"><span>Communication</span><strong>88%</strong></div><div className="progress-track"><span style={{ width: '88%' }} /></div></div>
+          <div className="competency-row"><div className="competency-label-row"><span>Example quality</span><strong>76%</strong></div><div className="progress-track"><span style={{ width: '76%' }} /></div></div>
+          <div className="timer-box"><TimerReset size={16} /><span>Round timer</span><strong>23:14</strong></div>
+        </aside>
+      </div>
+
+      <div className="section" style={{ paddingTop: 24, paddingBottom: 0 }}>
+        <div className="workflow-grid" style={{ marginTop: 8 }}>
+          {interviewModes.map(({ label, summary }) => (
+            <article key={label} className="workflow-card">
+              <span className="step-number">{label}</span>
+              <h3>{label}</h3>
+              <p>{summary}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="section" style={{ paddingTop: 16, paddingBottom: 0 }}>
+        <div className="readiness-grid">
+          <div className="report-card">
+            <SectionHeading eyebrow="What makes it different" title="Practice telling the story of your work." description="SkillAI helps you organize your experience, explain your decisions, and speak clearly about what you can contribute in your chosen profession." />
+            <div className="score-breakdown">
+              <div><span>Clarity</span><strong>86</strong></div>
+              <div><span>Relevant examples</span><strong>82</strong></div>
+              <div><span>Communication</span><strong>79</strong></div>
+              <div><span>Confidence</span><strong>74</strong></div>
+            </div>
+          </div>
+
+          <div className="weakness-card">
+            <div className="panel-header"><strong>How it works</strong><span>AI-powered</span></div>
+            <div className="weakness-list">
+              {deliveryFeatures.map(({ title, copy }) => (
+                <div key={title} className="weakness-item">
+                  <h4>{title}</h4>
+                  <small>{copy}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </StandardPage>
+  );
+}
+
+function ResumePage() {
+  return (
+    <StandardPage
+      eyebrow="Resume tools"
+      title="Make your resume work harder for your next opportunity."
+      description="Use your resume to prepare for a more relevant AI interview. SkillAI reads PDF, DOCX, and TXT files in your browser and uses the extracted text to tailor interview questions—with your consent."
+      illustration="/career-interview.svg"
+      illustrationAlt="Learner preparing for an interview using their resume"
+      startTo="/interview/start"
+    >
+      <section className="resume-tools-grid" aria-label="Resume preparation steps">
+        <article className="resume-tool-card">
+          <span className="resume-tool-icon"><FileText size={20} /></span>
+          <span className="eyebrow">01 · Add your resume</span>
+          <h2>Start with your experience</h2>
+          <p>Upload a PDF, DOCX, or TXT resume from your device in the AI Interview setup. The original file stays in your browser.</p>
+        </article>
+        <article className="resume-tool-card">
+          <span className="resume-tool-icon"><ShieldCheck size={20} /></span>
+          <span className="eyebrow">02 · Choose what matters</span>
+          <h2>Set your direction</h2>
+          <p>Select a branch and interview domain. Review the details and choose whether to share extracted resume text for tailored questions.</p>
+        </article>
+        <article className="resume-tool-card">
+          <span className="resume-tool-icon"><Sparkles size={20} /></span>
+          <span className="eyebrow">03 · Practice with purpose</span>
+          <h2>Get role-aware practice</h2>
+          <p>Answer questions shaped by your chosen field and resume experience, then review feedback to improve your next response.</p>
+        </article>
+      </section>
+      <div className="resume-tools-privacy">
+        <strong>Your resume stays yours.</strong>
+        <p>The original file is not uploaded or stored by SkillAI. Extracted text is sent to the AI service only after you give consent in the interview setup.</p>
+      </div>
+    </StandardPage>
+  );
+}
+
+function AssessmentPage() {
+  return (
+    <StandardPage eyebrow="AI-Powered Skill Assessment" title="Take an online skill assessment and see what to learn next." description="Test your knowledge in a selected subject or career field with tailored AI-generated questions. Review your strengths and get practical suggestions for what to build next." illustration="/career-assessment.svg" illustrationAlt="Learner reviewing a personal skill assessment" startTo="/assessment/start">
+      <div className="readiness-grid" style={{ marginTop: 24 }}>
+        <div className="report-card">
+          <div className="big-score"><strong>78</strong><span>/ 100</span></div>
+          <div className="score-breakdown">
+            <div><span>Field Knowledge</span><strong>84</strong></div>
+            <div><span>Interview Performance</span><strong>76</strong></div>
+            <div><span>Communication</span><strong>72</strong></div>
+            <div><span>Practical Experience</span><strong>81</strong></div>
+          </div>
+        </div>
+        <div className="weakness-card">
+          <div className="panel-header"><strong>Focus areas</strong><span>Recommended</span></div>
+          <div className="weakness-list">
+            {[['Communication', 'Confident'], ['Applied Knowledge', 'Confident'], ['Planning Next Steps', 'Confident']].map(([skill, level]) => (
+              <div key={skill} className="weakness-item">
+                <h4>{skill}</h4>
+                <div className="weakness-meta"><span>Current: Intermediate</span><span>Target: {level}</span></div>
+                <small>Use practical examples to show what you know and where you want to grow.</small>
               </div>
             ))}
           </div>
         </div>
-      </section>
-      <CTASection
-        title="Looking for the right software for your team?"
-        copy="Talk with Raj Infotech about licensing, technical consultation or training."
-        button="Talk to Our Team"
-      />
-    </main>
-  );
-}
-
-function ProjectCard({ project }) {
-  return (
-    <article className="project-card">
-      <Link to={`/projects/${project.slug}`} className="project-card-image">
-        <Photo name={project.image} alt={`${project.title} project`} />
-        <span className="project-category">{project.category}</span>
-        <span className="tile-arrow">
-          <ArrowUpRight size={17} />
-        </span>
-      </Link>
-      <div className="project-card-copy">
-        <h2>
-          <Link to={`/projects/${project.slug}`}>{project.title}</Link>
-        </h2>
-        <p>{project.description}</p>
-        <div className="project-tech">
-          <span>TECHNOLOGY</span>
-          <small>{project.technology}</small>
-        </div>
-        <Link className="text-link" to={`/projects/${project.slug}`}>
-          View project
-          <ArrowRight size={15} />
-        </Link>
       </div>
-    </article>
-  );
-}
-
-function ProjectsPage() {
-  const [filter, setFilter] = useState("All");
-  const categories = ["All", "Robotics", "IoT", "Electronics", "AI"];
-  const filtered =
-    filter === "All"
-      ? projectList
-      : projectList.filter((project) => project.category === filter);
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="PROJECT LIBRARY"
-          title="Projects students can build"
-          description="A selection of practical builds for exploring robotics, electronics, connected devices and AI. Project scope can be adapted to learner level and available equipment."
-        />
-        <div
-          className="filter-bar"
-          role="group"
-          aria-label="Filter projects by technology"
-        >
-          {categories.map((category) => (
-            <button
-              type="button"
-              key={category}
-              className={filter === category ? "filter-active" : ""}
-              aria-pressed={filter === category}
-              onClick={() => setFilter(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-        <div className="project-grid">
-          {filtered.map((project) => (
-            <ProjectCard key={project.slug} project={project} />
-          ))}
-        </div>
-      </div>
-      <CTASection
-        title="Looking for the right project pathway?"
-        copy="We can help connect project choices to your lab equipment and learning goals."
-        button="Talk About Project Training"
-      />
-    </main>
-  );
-}
-
-function ProjectDetailPage() {
-  const { slug } = useParams();
-  const project = projectList.find((entry) => entry.slug === slug);
-  if (!project) return <NotFoundPage />;
-  return (
-    <main className="inner-page project-detail-page">
-      <div className="wrap">
-        <Link to="/projects" className="back-link">
-          <ArrowLeft size={16} /> All projects
-        </Link>
-        <PageHeading
-          eyebrow={`${project.category.toUpperCase()} PROJECT`}
-          title={project.title}
-          description={project.description}
-        />
-        <div className="project-detail">
-          <Photo
-            name={project.image}
-            alt={`${project.title} project`}
-            width={1300}
-          />
-          <aside>
-            <span className="eyebrow">TECHNOLOGY USED</span>
-            <h2>What learners explore</h2>
-            <p>{project.technology}</p>
-            <div className="detail-divider" />
-            <span className="eyebrow">A PRACTICAL PATHWAY</span>
-            <p>
-              Students can explore the components, plan a build, programme a
-              response and test how their design performs. The level of detail
-              can be adapted to the learners and lab setup.
-            </p>
-            <Link className="button" to={contactPath}>
-              Ask about this project
-              <ArrowUpRight size={16} />
-            </Link>
-          </aside>
-        </div>
-      </div>
-      <CTASection title="Bring this kind of project into your lab." />
-    </main>
-  );
-}
-
-function TrainingPage() {
-  const training = [
-    {
-      id: "student-training",
-      title: "Student training",
-      image: studentTrainingImage,
-      intro:
-        "Practical sessions that help students move from a concept to a working build.",
-      topics: [
-        "Robotics",
-        "Arduino",
-        "ESP32",
-        "IoT",
-        "Python",
-        "AI",
-        "Electronics",
-        "Automation",
-      ],
-    },
-    {
-      id: "teacher-training",
-      title: "Teacher training",
-      image: teacherTrainingImage,
-      intro:
-        "Support for educators bringing lab equipment and project-based learning into lessons.",
-      topics: [
-        "Lab operation",
-        "Robotics fundamentals",
-        "Project implementation",
-        "Curriculum support",
-        "Practical teaching",
-      ],
-    },
-    {
-      id: "workshops",
-      title: "Workshops",
-      image: iotWorkshopImage,
-      intro:
-        "Focused, hands-on formats for introducing a topic or building on existing skills.",
-      topics: [
-        "Robotics workshop",
-        "STEM workshop",
-        "AI workshop",
-        "IoT workshop",
-        "Innovation workshop",
-      ],
-    },
-  ];
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="TRAINING & WORKSHOPS"
-          title="Practical robotics & technology training"
-          description="Help students and teachers feel at home in the lab with hands-on learning built around equipment, projects and the classroom."
-        />
-      </div>
-      <section className="training-intro wrap">
-        <Photo
-          name={studentTranningImage}
-          alt="A facilitator and learners collaborating in a workshop"
-        />
-        <div>
-          <span className="eyebrow">LEARN BY MAKING</span>
-          <h2>Useful skills grow through practice.</h2>
-          <p>
-            Training is most valuable when it connects directly to the lab and
-            the work learners are expected to do. Sessions can be shaped for
-            student groups, teachers and focused workshops.
-          </p>
-          <Link to={contactPath} className="text-link">
-            Enquire about training
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="LEARNING FORMATS"
-            title="Training for the people using the lab."
-            description="Choose a focused session or build a learning pathway across the academic year."
-          />
-          <div className="training-grid">
-            {training.map((item, index) => (
-              <article className="training-card" id={item.id} key={item.title}>
-                <div className="training-image">
-                  <Photo name={item.image} alt={item.title} />
-                  <span>0{index + 1}</span>
-                </div>
-                <div className="training-content">
-                  <h3>{item.title}</h3>
-                  <p>{item.intro}</p>
-                  <div className="tag-list">
-                    {item.topics.map((topic) => (
-                      <span key={topic}>{topic}</span>
-                    ))}
-                  </div>
-                  <Link className="text-link" to={contactPath}>
-                    Enquire about this programme
-                    <ArrowRight size={15} />
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <CTASection
-        title="Let’s find the right training format."
-        button="Enquire About Training"
-      />
-    </main>
-  );
-}
-
-function CareerPage() {
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="CAREERS"
-          title="Help learners build what comes next."
-          description="Bring practical technology and hands-on learning to schools, colleges and communities with Raj Infotech."
-        />
-        <section className="about-audience">
-          <div>
-            <span className="eyebrow">WORK WITH US</span>
-            <h2>Make technology tangible for learners.</h2>
-            <p>
-              We welcome introductions from people interested in robotics,
-              STEM education, electronics, AI, IoT and hands-on training.
-              Tell us about your experience and the kind of work you want to do.
-            </p>
-            <div className="tag-list">
-              <span>Robotics & STEM</span>
-              <span>AI & IoT</span>
-              <span>Electronics</span>
-              <span>Education & training</span>
-            </div>
-            <a
-              className="button"
-              href={`mailto:${contactEmail}?subject=${encodeURIComponent("Career enquiry")}`}
-            >
-              Send your profile
-              <ArrowUpRight size={16} />
-            </a>
-          </div>
-          <Photo
-            name={roboticsLabImage}
-            alt="Robotics lab for hands-on technology learning"
-          />
-        </section>
-      </div>
-      <section className="section section-tint">
-        <div className="wrap">
-          <SectionHeading
-            eyebrow="AREAS OF WORK"
-            title="Bring your skills into the learning lab."
-            description="We welcome profiles for current or future opportunities across practical education, lab solutions and technology projects."
-          />
-          <div className="benefit-grid">
-            {[
-              [
-                "01",
-                "Robotics & STEM training",
-                "Help learners and educators explore robotics, electronics and STEM concepts through guided, hands-on sessions.",
-              ],
-              [
-                "02",
-                "Lab setup & applications",
-                "Connect lab equipment, learning goals and project activities to create useful setups for schools and institutions.",
-              ],
-              [
-                "03",
-                "AI, IoT & project mentoring",
-                "Support practical builds involving sensors, connected devices, computer vision and student-led prototypes.",
-              ],
-            ].map(([number, title, copy]) => (
-              <article className="benefit" key={number}>
-                <span className="benefit-number">{number}</span>
-                <div>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-              </article>
-            ))}
-          </div>
+      <section className="assessment-examples">
+        <SectionHeading eyebrow="Across every discipline" title="Skills show up differently in every field." description="A useful assessment looks at more than one kind of knowledge. It recognizes how you learn, apply ideas, and work with others." />
+        <div className="assessment-example-grid">
+          <article><span>Engineering</span><h3>Practical problem solving</h3><p>Show how you approach a challenge, test ideas, and improve a solution.</p></article>
+          <article><span>Healthcare</span><h3>Care and communication</h3><p>Reflect on applied knowledge, clear communication, and thoughtful decisions.</p></article>
+          <article><span>Business</span><h3>Analysis and teamwork</h3><p>Connect information, collaborate, and explain the reasoning behind a decision.</p></article>
+          <article><span>Arts & design</span><h3>Creative practice</h3><p>Present your process, creative choices, and the needs your work responds to.</p></article>
         </div>
       </section>
       <section className="section wrap">
-        <SectionHeading
-          eyebrow="START A CONVERSATION"
-          title="Give us a clear picture of your work."
-          description="A focused introduction helps us understand where your experience could fit."
-        />
-        <div className="benefit-grid">
-          {[
-            [
-              "01",
-              "Share your profile",
-              "Include your CV or portfolio and the city or location you are available for.",
-            ],
-            [
-              "02",
-              "Tell us what you work with",
-              "Mention relevant tools, technologies, training experience and projects you have built or supported.",
-            ],
-            [
-              "03",
-              "Describe the work you want to do",
-              "Let us know whether you are interested in training, lab applications, engineering or project mentoring.",
-            ],
-          ].map(([number, title, copy]) => (
-            <article className="benefit" key={number}>
-              <span className="benefit-number">{number}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </div>
+        <SectionHeading eyebrow="Online skills test FAQ" title="Skill assessment questions, answered." description="Learn what an AI-powered assessment covers, how free practice works, and how to use your results." />
+        <div className="workflow-grid">
+          {ASSESSMENT_FAQS.map(({ question, answer }, index) => (
+            <article key={question} className="workflow-card">
+              <span className="step-number">{String(index + 1).padStart(2, "0")}</span>
+              <h3>{question}</h3>
+              <p>{answer}</p>
             </article>
           ))}
         </div>
       </section>
-    </main>
+    </StandardPage>
   );
 }
 
-function GalleryPage() {
-  const categories = [
-    "All",
-    "Robotics Labs",
-    "STEM Labs",
-    "Students",
-    "Training",
-    "Projects",
-    "Equipment",
-  ];
-  const [filter, setFilter] = useState("All");
-  const [selected, setSelected] = useState(null);
-  const filtered =
-    filter === "All"
-      ? galleryItems
-      : galleryItems.filter((item) => item.category === filter);
-
-  useEffect(() => {
-    if (!selected) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") setSelected(null);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    document.body.classList.add("lightbox-open");
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.classList.remove("lightbox-open");
-    };
-  }, [selected]);
-
-  return (
-    <main className="inner-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="IN THE LAB"
-          title="Our robotics & STEM lab gallery"
-          description="A visual look at collaborative learning, technology and project work. These are editorial stock photographs, not images of a specific company installation."
-        />
-        <div
-          className="filter-bar gallery-filters"
-          role="group"
-          aria-label="Filter gallery images"
-        >
-          {categories.map((category) => (
-            <button
-              type="button"
-              key={category}
-              className={filter === category ? "filter-active" : ""}
-              aria-pressed={filter === category}
-              onClick={() => setFilter(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-        <div className="gallery-grid">
-          {filtered.map((item) => (
-            <button
-              className="gallery-item"
-              type="button"
-              key={item.title}
-              onClick={() => setSelected(item)}
-              aria-label={`View image: ${item.title}`}
-            >
-              <Photo name={item.image} alt={item.title} />
-              <span className="gallery-caption">
-                <span>{item.category}</span>
-                <strong>{item.title}</strong>
-                <MoveUpRight size={18} />
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-      {selected && (
-        <div
-          className="lightbox"
-          role="dialog"
-          aria-modal="true"
-          aria-label={selected.title}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setSelected(null);
-          }}
-        >
-          <button
-            type="button"
-            className="lightbox-close icon-button"
-            aria-label="Close image viewer"
-            onClick={() => setSelected(null)}
-          >
-            <X size={24} />
-          </button>
-          <Photo name={selected.image} alt={selected.title} width={1600} />
-          <div className="lightbox-caption">
-            <span>{selected.category}</span>
-            <strong>{selected.title}</strong>
-          </div>
-        </div>
-      )}
-      <CTASection title="See your ideas take shape." button="Plan a Lab" />
-    </main>
-  );
-}
-
-function ContactPage() {
-  const [formStatus, setFormStatus] = useState("");
-  const onSubmit = (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const fields = [
-      ["Name", "name"],
-      ["Institution", "institution"],
-      ["Email", "email"],
-      ["Phone", "phone"],
-      ["City", "city"],
-      ["Institution type", "institutionType"],
-      ["Student strength", "studentStrength"],
-      ["Lab requirement", "labRequirement"],
-      ["Budget range", "budget"],
-      ["Message", "message"],
-    ];
-    const body = fields
-      .map(([label, name]) => `${label}: ${formData.get(name) || "Not provided"}`)
-      .join("\n");
-    const subject = `Lab proposal enquiry from ${formData.get("institution")}`;
-    setFormStatus(
-      "Opening your email app with the enquiry addressed to Raj Infotech. If it does not open, email sales@rajinfotechindia.com directly.",
-    );
-    window.location.href = `mailto:${companyEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-  return (
-    <main className="inner-page contact-page">
-      <div className="wrap">
-        <PageHeading
-          eyebrow="START A CONVERSATION"
-          title="Let’s build your robotics lab"
-          description="Share a little about your institution, learners and plans. We’ll use that context to shape the conversation."
-        />
-        <div className="contact-layout">
-          <form className="contact-form" onSubmit={onSubmit}>
-            <div className="form-heading">
-              <span className="eyebrow">LAB PROPOSAL ENQUIRY</span>
-              <h2>Tell us what you’re planning.</h2>
-              <p>Fields marked with an asterisk are required.</p>
-            </div>
-            <div className="form-grid">
-              <label>
-                Name *
-                <input
-                  name="name"
-                  autoComplete="name"
-                  required
-                  placeholder="Your name"
-                />
-              </label>
-              <label>
-                Institution name *
-                <input
-                  name="institution"
-                  required
-                  placeholder="School, college or organisation"
-                />
-              </label>
-              <label>
-                Email *
-                <input
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="name@institution.org"
-                />
-              </label>
-              <label>
-                Phone
-                <input
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  placeholder="Include your country code"
-                />
-              </label>
-              <label>
-                City
-                <input
-                  name="city"
-                  autoComplete="address-level2"
-                  placeholder="City"
-                />
-              </label>
-              <label>
-                Institution type
-                <select name="institutionType" defaultValue="">
-                  <option value="" disabled>
-                    Select an institution
-                  </option>
-                  <option>School (CBSE / ICSE / other)</option>
-                  <option>College or university</option>
-                  <option>Skill development centre</option>
-                  <option>Atal Tinkering Lab</option>
-                  <option>STEM innovation centre</option>
-                  <option>Government education programme</option>
-                  <option>Other</option>
-                </select>
-              </label>
-              <label>
-                Student strength
-                <input
-                  name="studentStrength"
-                  inputMode="numeric"
-                  placeholder="Approximate number of learners"
-                />
-              </label>
-              <label>
-                Lab requirement
-                <select name="labRequirement" defaultValue="">
-                  <option value="" disabled>
-                    Select a requirement
-                  </option>
-                  <option>Robotics lab</option>
-                  <option>STEM lab</option>
-                  <option>AI lab</option>
-                  <option>IoT lab</option>
-                  <option>Automation lab</option>
-                  <option>Electronics lab</option>
-                  <option>Multiple labs</option>
-                  <option>Training or workshops</option>
-                </select>
-              </label>
-              <label>
-                Budget range
-                <select name="budget" defaultValue="">
-                  <option value="" disabled>
-                    Select a range (optional)
-                  </option>
-                  <option>Not yet decided</option>
-                  <option>Under ₹2 lakh</option>
-                  <option>₹2–5 lakh</option>
-                  <option>₹5–10 lakh</option>
-                  <option>₹10 lakh and above</option>
-                </select>
-              </label>
-              <label className="form-wide">
-                Message
-                <textarea
-                  name="message"
-                  rows="5"
-                  placeholder="What would you like your students to be able to do?"
-                />
-              </label>
-            </div>
-            <button className="button" type="submit">
-              Request a Lab Proposal
-              <ArrowUpRight size={16} />
-            </button>
-            {formStatus && (
-              <p className="form-status" role="status">
-                {formStatus}
-              </p>
-            )}
-            <p className="form-disclaimer">
-              Submitting opens your email app with the enquiry addressed to Raj
-              Infotech. Nothing is stored by this website.
-            </p>
-          </form>
-          <aside className="contact-aside">
-            <div className="contact-aside-head">
-              <span className="eyebrow eyebrow-light">
-                RAJ INFOTECH · JAIPUR
-              </span>
-              <h2>Tell us what your learners need.</h2>
-              <p>
-                From one project kit to a complete learning environment, begin
-                with the outcomes you have in mind.
-              </p>
-            </div>
-            <div className="contact-detail">
-              <span>EMAIL</span>
-              <p><a href={`mailto:${companyEmail}`}>{companyEmail}</a></p>
-              <p><a href={`mailto:${contactEmail}`}>{contactEmail}</a></p>
-            </div>
-            <div className="contact-detail">
-              <span>PHONE</span>
-              <p><a href={`tel:${companyPhone.replaceAll(" ", "")}`}>{companyPhone}</a></p>
-            </div>
-            <div className="contact-detail">
-              <span>LOCATION</span>
-              <p><a href={`https://maps.google.com/?q=${encodeURIComponent(companyAddress)}`} target="_blank" rel="noreferrer">{companyAddress}</a></p>
-            </div>
-            <div className="contact-detail">
-              <span>WORKING HOURS</span>
-              <p>Please call or email to confirm availability.</p>
-            </div>
-            <div className="contact-aside-foot">
-              <span className="aside-icon">
-                <ArrowDownRight size={20} />
-              </span>
-              <p>
-                Serving education and technology needs from Jaipur, Rajasthan.
-              </p>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function NotFoundPage() {
-  return (
-    <main className="not-found wrap">
-      <span className="eyebrow">PAGE NOT FOUND</span>
-      <h1>That page isn’t here.</h1>
-      <p>The link may have moved. Let’s get you back to the lab.</p>
-      <Link className="button" to="/">
-        Back to home
-        <ArrowRight size={16} />
-      </Link>
-    </main>
-  );
-}
-
-const pageMetadata = {
-  "/": [
-    "Robotics Lab Setup for Schools & Colleges",
-    "Robotics, STEM, AI and IoT lab planning, equipment, projects and training from Raj Infotech, Jaipur.",
-  ],
-  "/about": [
-    "About Our Robotics & STEM Lab Solutions",
-    "Meet Raj Infotech, a Jaipur-based technology company with 28+ years of experience.",
-  ],
-  "/robotics-labs": [
-    "Robotics Lab Setup for Schools & Colleges",
-    "Explore school and advanced robotics lab setup, equipment categories and learning pathways.",
-  ],
-  "/stem-labs": [
-    "STEM Lab Setup & Innovation Labs",
-    "Plan a STEM innovation, electronics, maker or Atal Tinkering lab for practical learning.",
-  ],
-  "/ai-iot": [
-    "AI & IoT Lab Setup for Educational Institutions",
-    "Explore AI, IoT, computer vision and automation lab pathways for learners.",
-  ],
-  "/software-solutions": [
-    "Software Solutions & Licensed Distribution",
-    "Licensed software, consulting, training and support from Raj Infotech for academic and commercial clients.",
-  ],
-  "/projects": [
-    "Robotics & STEM Projects for Students",
-    "Browse hands-on robotics, electronics, IoT and AI project ideas for students.",
-  ],
-  "/training": [
-    "Robotics & STEM Training Programs",
-    "Practical robotics, AI, IoT and STEM training for students and teachers.",
-  ],
-  "/career": [
-    "Careers at Raj Infotech",
-    "Explore opportunities to support robotics, STEM and hands-on technology learning.",
-  ],
-  "/contact": [
-    "Contact Us for Robotics Lab Setup",
-    "Contact Raj Infotech in Jaipur about robotics, STEM, AI or IoT lab setup.",
-  ],
-};
-
-export default function App() {
-  const location = useLocation();
-
-  useEffect(() => {
-    const pathname = location.pathname;
-    const isProject = pathname.startsWith("/projects/");
-    const project = isProject
-      ? projectList.find((entry) => entry.slug === pathname.split("/")[2])
-      : null;
-    const [title, description] = project
-      ? [
-          `${project.title} | Student Robotics & STEM Projects`,
-          project.description,
-        ]
-      : pageMetadata[pathname] || [
-          "Page not found",
-          "Explore robotics and STEM lab solutions for educational institutions.",
-        ];
-    document.title = `${title} | ${company}`;
-    const setMeta = (selector, create, content) => {
-      let element = document.head.querySelector(selector);
-      if (!element) {
-        element = document.createElement("meta");
-        Object.assign(element, create);
-        document.head.appendChild(element);
-      }
-      element.content = content;
-    };
-    const pageUrl = new URL(location.pathname, window.location.origin).href;
-    const socialImage = new URL(photos.workshop, window.location.origin).href;
-    setMeta('meta[name="description"]', { name: "description" }, description);
-    setMeta('meta[property="og:title"]', { property: "og:title" }, document.title);
-    setMeta(
-      'meta[property="og:description"]',
-      { property: "og:description" },
-      description,
-    );
-    setMeta('meta[property="og:url"]', { property: "og:url" }, pageUrl);
-    setMeta('meta[property="og:image"]', { property: "og:image" }, socialImage);
-    setMeta(
-      'meta[name="twitter:title"]',
-      { name: "twitter:title" },
-      document.title,
-    );
-    setMeta(
-      'meta[name="twitter:description"]',
-      { name: "twitter:description" },
-      description,
-    );
-    setMeta(
-      'meta[name="twitter:image"]',
-      { name: "twitter:image" },
-      socialImage,
-    );
-    let canonical = document.head.querySelector('link[rel="canonical"]');
-    if (!canonical) {
-      canonical = document.createElement("link");
-      canonical.rel = "canonical";
-      document.head.appendChild(canonical);
-    }
-    canonical.href = pageUrl;
-
-    let organizationSchema = document.getElementById("organization-schema");
-    if (!organizationSchema) {
-      organizationSchema = document.createElement("script");
-      organizationSchema.id = "organization-schema";
-      organizationSchema.type = "application/ld+json";
-      document.head.appendChild(organizationSchema);
-    }
-    organizationSchema.textContent = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      name: company,
-      url: `${window.location.origin}/`,
-      logo: new URL(aitechnoLogo, window.location.origin).href,
-      description:
-        "Jaipur-based technology company providing robotics lab setups, technical education, software solutions and training.",
-      telephone: companyPhone,
-      email: companyEmail,
-      address: {
-        "@type": "PostalAddress",
-        streetAddress: "106-107, Mahima Majesty, Ram Gali No. 6, Raja Park",
-        addressLocality: "Jaipur",
-        addressRegion: "Rajasthan",
-        postalCode: "302004",
-        addressCountry: "IN",
-      },
+function getOpenAlexAbstract(invertedIndex) {
+  if (!invertedIndex) return "";
+  const words = [];
+  Object.entries(invertedIndex).forEach(([word, positions]) => {
+    positions.forEach((position) => {
+      words[position] = word;
     });
-    if (location.hash) {
-      window.setTimeout(
-        () =>
-          document
-            .getElementById(decodeURIComponent(location.hash.slice(1)))
-            ?.scrollIntoView({ behavior: "smooth" }),
-        80,
-      );
-    } else {
-      window.scrollTo({ top: 0, behavior: "instant" });
+  });
+  return words.filter(Boolean).join(" ").replace(/\s+([.,;:!?])/g, "$1");
+}
+
+function ResearchPaperAssistant({ paper }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [summary, setSummary] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [question, setQuestion] = useState("");
+  const [questionCount, setQuestionCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
+  const canAsk = Boolean(paper.abstract) && questionCount < 3 && !isLoading;
+
+  const requestAssistant = async (action, askedQuestion = "") => {
+    setError("");
+    setUpgradeRequired(false);
+    setIsLoading(true);
+    try {
+      const token = await getFirebaseIdToken();
+      const response = await fetch(apiUrl("/api/research-assistant"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action,
+          paperId: paper.id,
+          title: paper.title,
+          year: paper.year,
+          journal: paper.journal,
+          abstract: paper.abstract,
+          question: askedQuestion,
+          history: messages.slice(-4),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setUpgradeRequired(result.code === "QUOTA_EXHAUSTED");
+        throw new Error(result.error || "Research AI could not answer. Please try again.");
+      }
+      if (typeof result.answer !== "string" || !result.answer.trim()) {
+        throw new Error("Research AI returned an empty answer. Please try again.");
+      }
+      if (action === "summarize") {
+        setSummary(result.answer.trim());
+      } else {
+        setMessages((current) => [...current, { question: askedQuestion, answer: result.answer.trim() }]);
+        setQuestionCount((count) => count + 1);
+        setQuestion("");
+      }
+    } catch (requestError) {
+      setError(requestError.message || "Research AI could not answer. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-  }, [location.pathname, location.hash]);
+  };
+
+  const handleAsk = (event) => {
+    event.preventDefault();
+    const askedQuestion = question.trim();
+    if (!askedQuestion || !canAsk) return;
+    requestAssistant("ask", askedQuestion);
+  };
 
   return (
-    <div id="top" className="app-shell">
-      <Header />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/robotics-labs" element={<RoboticsPage />} />
-        <Route path="/stem-labs" element={<StemPage />} />
-        <Route path="/ai-iot" element={<AiIotPage />} />
-        <Route
-          path="/software-solutions"
-          element={<SoftwareSolutionsPage />}
-        />
-        <Route path="/projects" element={<ProjectsPage />} />
-        <Route path="/projects/:slug" element={<ProjectDetailPage />} />
-        <Route path="/training" element={<TrainingPage />} />
-        <Route path="/career" element={<CareerPage />} />
-        <Route path="/gallery" element={<Navigate to="/career" replace />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-      <Footer />
+    <div className="research-ai">
+      <button
+        type="button"
+        className="secondary-button research-ai-toggle"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <Sparkles size={16} /> {isOpen ? "Hide AI paper helper" : "Summarize / ask AI"}
+      </button>
+      {isOpen && (
+        <section className="research-ai-panel" aria-label={`AI paper helper for ${paper.title}`}>
+          <p className="research-ai-disclaimer">
+            AI uses only the paper abstract, not the full paper. Sign in to use AI paper help: Plus includes 10, Pro includes 30 AI paper requests per UTC month. You can ask up to 3 questions about each paper per page session.
+          </p>
+          {!paper.abstract && <p className="research-search-error" role="status">This paper has no available abstract, so AI summary and questions are unavailable.</p>}
+          {paper.abstract && !summary && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => requestAssistant("summarize")}
+              disabled={isLoading}
+            >
+              {isLoading ? <LoaderCircle size={16} className="research-spinner" /> : <Sparkles size={16} />}
+              {isLoading ? "Preparing summary..." : "Summarize this paper"}
+            </button>
+          )}
+          {summary && (
+            <article className="research-ai-summary">
+              <h4>Paper summary</h4>
+              <p>{summary}</p>
+            </article>
+          )}
+          {messages.map((message, index) => (
+            <article className="research-ai-answer" key={`${index}-${message.question}`}>
+              <h4>Your question</h4>
+              <p>{message.question}</p>
+              <h4>AI answer</h4>
+              <p>{message.answer}</p>
+            </article>
+          ))}
+          {paper.abstract && (
+            <form className="research-ai-form" onSubmit={handleAsk}>
+              <label className="research-filter" htmlFor={`research-ai-question-${paper.id}`}>
+                <span>Ask about this paper ({Math.max(0, 3 - questionCount)} questions left)</span>
+                <input
+                  id={`research-ai-question-${paper.id}`}
+                  type="text"
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  maxLength={500}
+                  placeholder="e.g. What is the main finding?"
+                  disabled={!canAsk}
+                />
+              </label>
+              <button type="submit" className="secondary-button" disabled={!canAsk || !question.trim()}>
+                Ask AI <ArrowRight size={15} />
+              </button>
+            </form>
+          )}
+          {isLoading && <p className="research-ai-loading" role="status">Reading the abstract and preparing a grounded answer…</p>}
+          {error && <div className="research-search-error" role="alert"><p>{error}</p>{upgradeRequired && <Link to="/pricing">View plans</Link>}</div>}
+        </section>
+      )}
     </div>
   );
 }
+
+function ResearchPage() {
+  const currentYear = new Date().getFullYear();
+  const branches = Object.keys(academicPaths);
+  const [form, setForm] = useState({
+    branch: branches[0],
+    course: academicPaths[branches[0]].courses[0],
+    domain: academicPaths[branches[0]].domains[0],
+    keywords: "",
+    fromYear: String(Math.max(1949, currentYear - 4)),
+    toYear: String(currentYear),
+    workType: "article",
+    sort: "relevance_score:desc",
+    openAccessOnly: false,
+    resultLimit: "20",
+  });
+  const [papers, setPapers] = useState([]);
+  const [searchError, setSearchError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchController = useRef(null);
+  const yearOptions = Array.from({ length: currentYear - 1949 }, (_, index) => String(currentYear - index));
+
+  useEffect(() => () => searchController.current?.abort(), []);
+
+  const handleBranchChange = (event) => {
+    const branch = event.target.value;
+    setForm((current) => ({
+      ...current,
+      branch,
+      course: academicPaths[branch].courses[0],
+      domain: academicPaths[branch].domains[0],
+    }));
+  };
+
+  const handleFromYearChange = (event) => {
+    const fromYear = event.target.value;
+    setForm((current) => ({
+      ...current,
+      fromYear,
+      toYear: Number(fromYear) > Number(current.toYear) ? fromYear : current.toYear,
+    }));
+  };
+
+  const handleToYearChange = (event) => {
+    const toYear = event.target.value;
+    setForm((current) => ({
+      ...current,
+      fromYear: Number(toYear) < Number(current.fromYear) ? toYear : current.fromYear,
+      toYear,
+    }));
+  };
+
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    setSearchError("");
+    setPapers([]);
+    setHasSearched(false);
+
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    setIsSearching(true);
+
+    const searchTerms = [form.domain, form.course, form.branch, form.keywords.trim()].filter(Boolean).join(" ");
+    const filters = [
+      `from_publication_date:${form.fromYear}-01-01`,
+      `to_publication_date:${form.toYear}-12-31`,
+      `type:${form.workType}`,
+      form.openAccessOnly ? "is_oa:true" : "",
+    ].filter(Boolean);
+    const params = new URLSearchParams({
+      search: searchTerms,
+      filter: filters.join(","),
+      "per-page": form.resultLimit,
+      sort: form.sort,
+      select: "id,doi,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,abstract_inverted_index",
+    });
+
+    try {
+      const response = await fetch(`https://api.openalex.org/works?${params}`, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`The scholarly search service returned ${response.status}. Please try again later.`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data.results)) {
+        throw new Error("The scholarly search service returned an unexpected response.");
+      }
+      setPapers(data.results.map((paper) => ({
+        id: paper.id,
+        title: paper.title || "Untitled research work",
+        year: paper.publication_year,
+        authors: (paper.authorships || []).map((entry) => entry.author?.display_name).filter(Boolean),
+        journal: paper.primary_location?.source?.display_name || paper.best_oa_location?.source?.display_name || "Publication details unavailable",
+        doi: paper.doi || "",
+        sourceUrl: paper.best_oa_location?.landing_page_url
+          || paper.primary_location?.landing_page_url
+          || paper.doi
+          || paper.id,
+        pdfUrl: paper.best_oa_location?.pdf_url || paper.primary_location?.pdf_url || "",
+        isOpenAccess: Boolean(paper.open_access?.is_oa),
+        citations: Number.isFinite(paper.cited_by_count) ? paper.cited_by_count : 0,
+        abstract: getOpenAlexAbstract(paper.abstract_inverted_index),
+      })));
+      setHasSearched(true);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setSearchError(error.message || "Research papers could not be loaded. Please try again.");
+      }
+    } finally {
+      if (searchController.current === controller) {
+        searchController.current = null;
+        setIsSearching(false);
+      }
+    }
+  };
+
+  const downloadResults = () => {
+    const columns = ["Title", "Authors", "Year", "Journal", "Citations", "DOI", "Source URL", "PDF URL"];
+    const rows = papers.map((paper) => [
+      paper.title,
+      paper.authors.join("; "),
+      paper.year,
+      paper.journal,
+      paper.citations,
+      paper.doi,
+      paper.sourceUrl,
+      paper.pdfUrl,
+    ]);
+    const csv = [columns, ...rows]
+      .map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+    const blobUrl = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "skillai-research-results.csv";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  return (
+    <main className="page-shell standard-page research-page">
+      <section className="standard-hero wrap">
+        <div className="standard-hero-copy">
+          <span className="eyebrow">Research Papers</span>
+          <h1>Find scholarly work for your field of study.</h1>
+          <p>Search indexed research by branch, course, subject area, publication dates, and optional keywords. Filter by work type and open access, then sort by relevance, citations, or date.</p>
+        </div>
+        <div className="standard-hero-art">
+          <img src="/career-research.svg" alt="Researcher exploring scholarly papers" />
+        </div>
+      </section>
+
+      <section className="wrap standard-content">
+        <div className="research-search-panel">
+          <div className="section-heading">
+            <span className="eyebrow">Paper finder</span>
+            <h2>Choose your academic area.</h2>
+            <p>Results are retrieved from OpenAlex. Search results include a source link; direct PDF downloads are shown only when the source provides an open-access PDF.</p>
+          </div>
+          <form className="research-search-form" onSubmit={handleSearch}>
+            <label className="research-filter" htmlFor="paper-branch">
+              <span>Branch</span>
+              <select id="paper-branch" value={form.branch} onChange={handleBranchChange}>
+                {branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-course">
+              <span>Course</span>
+              <select id="paper-course" value={form.course} onChange={(event) => setForm((current) => ({ ...current, course: event.target.value }))}>
+                {academicPaths[form.branch].courses.map((course) => <option key={course} value={course}>{course}</option>)}
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-domain">
+              <span>Subject area</span>
+              <select id="paper-domain" value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))}>
+                {academicPaths[form.branch].domains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-keywords">
+              <span>Keywords <small>(optional)</small></span>
+              <input id="paper-keywords" type="search" value={form.keywords} onChange={(event) => setForm((current) => ({ ...current, keywords: event.target.value }))} placeholder="e.g. machine learning" />
+            </label>
+            <label className="research-filter" htmlFor="paper-from-year">
+              <span>From year</span>
+              <select id="paper-from-year" value={form.fromYear} onChange={handleFromYearChange}>
+                {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-to-year">
+              <span>To year</span>
+              <select id="paper-to-year" value={form.toYear} onChange={handleToYearChange}>
+                {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-type">
+              <span>Work type</span>
+              <select id="paper-type" value={form.workType} onChange={(event) => setForm((current) => ({ ...current, workType: event.target.value }))}>
+                <option value="article">Journal article</option>
+                <option value="review">Review</option>
+                <option value="preprint">Preprint</option>
+                <option value="book-chapter">Book chapter</option>
+                <option value="book">Book</option>
+                <option value="dissertation">Dissertation</option>
+                <option value="dataset">Dataset</option>
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-sort">
+              <span>Sort by</span>
+              <select id="paper-sort" value={form.sort} onChange={(event) => setForm((current) => ({ ...current, sort: event.target.value }))}>
+                <option value="relevance_score:desc">Most relevant</option>
+                <option value="cited_by_count:desc">Most cited</option>
+                <option value="publication_date:desc">Newest first</option>
+                <option value="publication_date:asc">Oldest first</option>
+              </select>
+            </label>
+            <label className="research-filter" htmlFor="paper-result-limit">
+              <span>Results</span>
+              <select id="paper-result-limit" value={form.resultLimit} onChange={(event) => setForm((current) => ({ ...current, resultLimit: event.target.value }))}>
+                <option value="20">20 papers</option>
+                <option value="50">50 papers</option>
+                <option value="100">100 papers</option>
+              </select>
+            </label>
+            <label className="research-filter research-filter-checkbox" htmlFor="paper-open-access">
+              <input id="paper-open-access" type="checkbox" checked={form.openAccessOnly} onChange={(event) => setForm((current) => ({ ...current, openAccessOnly: event.target.checked }))} />
+              <span>Open-access only</span>
+            </label>
+            <button type="submit" className="primary-button research-search-button" disabled={isSearching}>
+              {isSearching ? <LoaderCircle size={17} className="research-spinner" /> : <Search size={17} />}
+              {isSearching ? "Searching papers..." : "Find research papers"}
+            </button>
+          </form>
+          {searchError && <p className="research-search-error" role="alert">{searchError}</p>}
+        </div>
+
+        {isSearching && (
+          <div className="research-result-status" role="status" aria-label="Searching research papers">
+            <LoaderCircle size={32} className="research-spinner research-spinner-large" aria-hidden="true" />
+          </div>
+        )}
+        {hasSearched && (
+          <section className="research-results" aria-live="polite">
+            <div className="research-results-header">
+              <div>
+                <span className="eyebrow">Search results</span>
+                <h2>{papers.length ? `${papers.length} papers found` : "No papers found"}</h2>
+                <p>{form.domain} · {form.course} · {form.fromYear}–{form.toYear}{form.openAccessOnly ? " · Open access" : ""}</p>
+              </div>
+              {papers.length > 0 && (
+                <button type="button" className="secondary-button research-export-button" onClick={downloadResults}>
+                  <Download size={16} /> Download results
+                </button>
+              )}
+            </div>
+            {papers.length === 0 ? (
+              <div className="research-no-results">
+                <p>No matching papers were returned. Try broadening the date range, changing the work type, or using related keywords.</p>
+              </div>
+            ) : (
+              <div className="research-paper-list">
+                {papers.map((paper) => (
+                  <article key={paper.id} className="research-result-card">
+                    <div className="research-result-meta">
+                      <span>{paper.year || "Year unavailable"}</span>
+                      <span>{paper.isOpenAccess ? "Open access" : "Access via source"}</span>
+                      <span>{paper.citations.toLocaleString()} citations</span>
+                    </div>
+                    <h3>{paper.title}</h3>
+                    <p className="research-result-authors">{paper.authors.slice(0, 4).join(", ")}{paper.authors.length > 4 ? ` + ${paper.authors.length - 4} more` : ""}</p>
+                    <p className="research-result-journal">{paper.journal}</p>
+                    {paper.abstract && <p className="research-result-abstract">{paper.abstract}</p>}
+                    <ResearchPaperAssistant paper={paper} />
+                    {paper.doi && <p className="research-result-doi">DOI: {paper.doi.replace(/^https?:\/\/doi\.org\//, "")}</p>}
+                    <div className="research-result-actions">
+                      <a className="secondary-button" href={paper.sourceUrl} target="_blank" rel="noreferrer">
+                        View source <ExternalLink size={15} />
+                      </a>
+                      {paper.pdfUrl ? (
+                        <a className="primary-button" href={paper.pdfUrl} target="_blank" rel="noreferrer">
+                          Open / download PDF <Download size={15} />
+                        </a>
+                      ) : (
+                        <span className="research-pdf-unavailable">No direct open-access PDF listed</span>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            <p className="research-attribution">Research metadata provided by <a href="https://openalex.org" target="_blank" rel="noreferrer">OpenAlex</a>. Full-text access is controlled by each publisher or repository.</p>
+          </section>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function ResearchMakerPage() {
+  const [form, setForm] = useState({ topic: "", discipline: "Computer Science", format: "Research paper" });
+  const [outline, setOutline] = useState(null);
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const topic = form.topic.trim();
+    if (!topic) return;
+
+    const questions = {
+      "Research paper": `How does ${topic} influence current practices and outcomes in ${form.discipline}?`,
+      "Literature review": `What does existing research show about ${topic} in ${form.discipline}?`,
+      "Case study": `How does ${topic} shape practice in a specific ${form.discipline} context?`,
+    };
+    const approaches = {
+      "Research paper": "Choose qualitative, quantitative, or mixed methods that directly answer your research question. Define your data, participants, and analysis before collecting evidence.",
+      "Literature review": "Set a reproducible search strategy, choose relevant scholarly databases, and define inclusion criteria. Compare and synthesize findings rather than summarizing sources one by one.",
+      "Case study": "Select a clearly bounded case and combine appropriate evidence sources, such as documents, observations, or interviews. Explain how the case was selected and analyzed.",
+    };
+    const sections = {
+      "Research paper": [
+        ["Introduction", "Set the context, explain why the topic matters, and state the research question."],
+        ["Background and related work", "Review relevant evidence and identify the specific gap your study addresses."],
+        ["Methodology", "Describe the design, data sources, sampling, procedure, and analysis."],
+        ["Results and discussion", "Present findings clearly, interpret them against prior research, and note limitations."],
+        ["Conclusion", "Answer the research question and outline implications and future work."],
+      ],
+      "Literature review": [
+        ["Introduction and scope", "Define the topic, review question, boundaries, and why the review is needed."],
+        ["Search and selection method", "Document databases, search terms, dates, and inclusion or exclusion criteria."],
+        ["Thematic synthesis", "Group studies by themes, methods, or findings and compare their evidence."],
+        ["Research gaps", "Identify where evidence is limited, inconsistent, or missing."],
+        ["Conclusion", "Summarize what the literature establishes and recommend next research steps."],
+      ],
+      "Case study": [
+        ["Case context", "Describe the setting, case boundaries, and reason for selecting it."],
+        ["Case question and framework", "State the question and concepts that guide your analysis."],
+        ["Evidence and methods", "Explain sources, collection procedures, and how evidence will be analyzed."],
+        ["Findings and interpretation", "Present key observations and connect them to the framework and related research."],
+        ["Conclusion and limitations", "Summarize insights, transferability, limitations, and possible next steps."],
+      ],
+    };
+
+    setOutline({
+      title: `${topic}: A ${form.discipline} ${form.format}`,
+      question: questions[form.format],
+      approach: approaches[form.format],
+      sections: sections[form.format],
+    });
+  };
+
+  return (
+    <main className="page-shell standard-page research-maker-page">
+      <section className="standard-hero wrap">
+        <div className="standard-hero-copy">
+          <span className="eyebrow">Research Maker</span>
+          <h1>Shape a research idea into a clear outline.</h1>
+          <p>Enter a topic and get a practical starting structure for a research paper, literature review, or case study.</p>
+          <a href="#research-maker-form" className="primary-button">Build an outline <ArrowRight size={16} /></a>
+        </div>
+        <div className="standard-hero-art">
+          <img src="/career-research.svg" alt="Researcher organizing ideas and evidence" />
+        </div>
+      </section>
+
+      <section className="wrap standard-content">
+        <div className="research-maker-panel" id="research-maker-form">
+          <div className="section-heading">
+            <span className="eyebrow">Create a starter outline</span>
+            <h2>Start with your research question.</h2>
+            <p>This tool creates a template-based outline. It does not search for sources, verify facts, or write a finished paper.</p>
+          </div>
+          <form className="research-maker-form" onSubmit={handleSubmit}>
+            <label className="research-maker-field" htmlFor="research-topic">
+              <span>Research topic</span>
+              <input
+                id="research-topic"
+                type="text"
+                value={form.topic}
+                onChange={(event) => setForm((current) => ({ ...current, topic: event.target.value }))}
+                placeholder="For example, AI tools in university learning"
+                required
+              />
+            </label>
+            <label className="research-maker-field" htmlFor="research-discipline">
+              <span>Field of study</span>
+              <select
+                id="research-discipline"
+                value={form.discipline}
+                onChange={(event) => setForm((current) => ({ ...current, discipline: event.target.value }))}
+              >
+                {["Computer Science", "Engineering", "Healthcare", "Business", "Education", "Environmental Science", "Social Science", "Other"].map((field) => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+            </label>
+            <label className="research-maker-field" htmlFor="research-format">
+              <span>Research format</span>
+              <select
+                id="research-format"
+                value={form.format}
+                onChange={(event) => setForm((current) => ({ ...current, format: event.target.value }))}
+              >
+                {["Research paper", "Literature review", "Case study"].map((format) => (
+                  <option key={format} value={format}>{format}</option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="primary-button">Generate outline <ArrowRight size={16} /></button>
+          </form>
+        </div>
+
+        {outline && (
+          <section className="research-maker-result" aria-live="polite" aria-labelledby="research-outline-title">
+            <span className="eyebrow">Starter outline · {form.format}</span>
+            <h2 id="research-outline-title">{outline.title}</h2>
+            <div className="research-maker-guidance">
+              <article>
+                <h3>Research question</h3>
+                <p>{outline.question}</p>
+              </article>
+              <article>
+                <h3>Suggested approach</h3>
+                <p>{outline.approach}</p>
+              </article>
+            </div>
+            <ol className="research-maker-sections">
+              {outline.sections.map(([title, guidance]) => (
+                <li key={title}>
+                  <strong>{title}</strong>
+                  <p>{guidance}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="research-maker-disclaimer">Use this as a planning aid. Confirm requirements with your instructor, evaluate sources critically, and cite all evidence you use.</p>
+          </section>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function RoadmapPage() {
+  return (
+    <StandardPage eyebrow="Career Roadmap" title="Turn your goals into a path you can follow." description="Connect your strengths to practical milestones and explore career directions that feel right for you." illustration="/career-roadmap.svg" illustrationAlt="Professional planning a route toward career goals">
+      <div className="roadmap-grid" style={{ marginTop: 24 }}>
+        {[
+          { label: 'Current', title: 'Where you are today', skills: ['Your core knowledge', 'Coursework or training', 'Hands-on experience'], gap: ['Skills to strengthen', 'New areas to explore'], projects: ['A project that shows what you can do'] },
+          { label: 'Next', title: 'A direction to explore', skills: ['Transferable strengths', 'Role-specific knowledge', 'Communication'], gap: ['Experience to build', 'Tools or methods to learn'], projects: ['A practical portfolio or field project'] },
+          { label: 'Target', title: 'The goal you choose', skills: ['Capabilities for your goal', 'Professional practice', 'Continuous learning'], gap: ['Your next milestones', 'Support and experience'], projects: ['Work that demonstrates your growth'] },
+        ].map((step) => (
+          <article key={step.label} className="roadmap-card">
+            <span className="roadmap-label">{step.label}</span>
+            <h3>{step.title}</h3>
+            <div><h4>Skills</h4><ul>{step.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
+            <div><h4>Skill gap</h4><ul>{step.gap.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
+            <div><h4>Projects</h4><ul>{step.projects.map((project) => <li key={project}>{project}</li>)}</ul></div>
+          </article>
+        ))}
+      </div>
+    </StandardPage>
+  );
+}
+
+function ResourcesPage() {
+  return (
+    <StandardPage eyebrow="Resources" title="Find useful ways to keep learning and growing." description="Explore guides, learning materials, and practical advice chosen to support your goals in any field." illustration="/career-resources.svg" illustrationAlt="Learner exploring career and learning resources">
+      <div className="resource-grid" style={{ marginTop: 24 }}>
+        {resourceCards.map(({ category, level, title }) => (
+          <article key={title} className="resource-card">
+            <div className="resource-topline"><span>{category}</span><span>{level}</span></div>
+            <h3>{title}</h3>
+            <Link to="/resources" className="text-link">View resource <ArrowRight size={15} /></Link>
+          </article>
+        ))}
+      </div>
+    </StandardPage>
+  );
+}
+
+function PricingPage({ user, onLogout }) {
+  const [checkoutPlan, setCheckoutPlan] = useState("");
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [usage, setUsage] = useState(null);
+  const [usageError, setUsageError] = useState("");
+  const plans = [
+    {
+      name: "Free",
+      price: "₹0",
+      description: "Get started with the core SkillAI experience.",
+      features: [
+        "Create a SkillAI account",
+        "One lifetime AI interview or assessment start",
+        "Browse research papers; AI paper help is included in paid plans",
+        "Explore career resources",
+      ],
+      action: "Get started free",
+      featured: false,
+    },
+    {
+      name: "Plus",
+      price: "₹999",
+      description: "For learners building consistent practice habits.",
+      features: [
+        "Everything in Free",
+        "5 AI interviews + 5 assessments per UTC calendar month",
+        "20 questions per assessment",
+        "10 AI paper requests per UTC calendar month",
+        "Personalized feedback and progress review",
+        "Research Maker planning tools",
+      ],
+      action: "Choose Plus",
+      featured: true,
+    },
+    {
+      name: "Pro",
+      price: "₹1,999",
+      description: "For focused preparation across your career journey.",
+      features: [
+        "Everything in Plus",
+        "12 AI interviews + 12 assessments per UTC calendar month",
+        "20 questions per assessment",
+        "30 AI paper requests per UTC calendar month",
+        "Advanced interview preparation",
+        "Deeper skill and career insights",
+        "Priority access to new features",
+      ],
+      action: "Choose Pro",
+      featured: false,
+    },
+  ];
+
+  return (
+    <main className="page-shell pricing-page">
+      <section className="pricing-hero wrap">
+        <span className="eyebrow">Simple, transparent pricing</span>
+        <h1>Choose the support that fits your next step.</h1>
+        <p>Plans are priced in Indian rupees. Paid plans are one-time purchases valid for 30 days; they do not auto-renew.</p>
+      </section>
+      <section className="wrap pricing-plan-grid" aria-label="Monthly SkillAI plans">
+        {plans.map((plan) => (
+          <article key={plan.name} className={`pricing-plan-card${plan.featured ? " featured" : ""}`}>
+            {plan.featured && <span className="pricing-popular">Most popular</span>}
+            <h2>{plan.name}</h2>
+            <p className="pricing-plan-description">{plan.description}</p>
+            <p className="pricing-plan-price">
+              <strong>{plan.price}</strong>
+              {plan.price !== "₹0" && <span>/ 30 days</span>}
+              {plan.price === "₹0" && <span>forever</span>}
+            </p>
+            {plan.name === "Free" ? (
+              <Link to={user ? "/dashboard" : "/register"} className="secondary-button pricing-plan-action">
+                {plan.action} <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <button type="button" className={plan.featured ? "primary-button pricing-plan-action" : "secondary-button pricing-plan-action"} onClick={() => startCheckout(plan.name.toLowerCase())} disabled={Boolean(checkoutPlan)}>
+                {checkoutPlan === plan.name.toLowerCase() ? "Opening checkout..." : plan.action} <ArrowRight size={16} />
+              </button>
+            )}
+            <ul className="pricing-feature-list">
+              {plan.features.map((feature) => (
+                <li key={feature}><Check size={16} aria-hidden="true" />{feature}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </section>
+      {checkoutMessage && <div className="wrap pricing-checkout-message" role="status">
+        {checkoutMessage}
+        {!user && <Link to="/login">Sign in</Link>}
+        {user && user.authProvider !== "firebase" && <button type="button" className="text-link" onClick={onLogout}>Sign out, then sign in with Firebase</button>}
+      </div>}
+      {user?.authProvider === "firebase" && (
+        <section className="wrap pricing-current-plan" aria-live="polite">
+          {usage ? (
+            <>
+              <strong>Current plan: {usage.plan[0].toUpperCase() + usage.plan.slice(1)}</strong>
+              {usage.plan === "free" ? (
+                <span>Free practice used: {usage.freeUsed ? "1 of 1 lifetime use" : "0 of 1 lifetime uses"} (shared between interviews and assessments)</span>
+              ) : (
+                <span>Interviews: {usage.usage.interviews.used}/{usage.usage.interviews.limit} · Assessments: {usage.usage.assessments.used}/{usage.usage.assessments.limit} · AI paper requests: {usage.usage.research.used}/{usage.usage.research.limit} for {usage.month}</span>
+              )}
+              {usage.expiresAt && <span>Valid until {new Date(usage.expiresAt).toLocaleDateString()}</span>}
+            </>
+          ) : <span>{usageError || "Loading your current plan..."}</span>}
+        </section>
+      )}
+      <p className="wrap pricing-disclaimer">Paid plans are one-time purchases valid for 30 days; they do not auto-renew. Monthly feature limits reset on the first day of each UTC month. Free includes one lifetime practice start shared between interviews and assessments.</p>
+    </main>
+  );
+}
+
+function SocialAuthButtons({ mode, onLogin, onError, disabled = false }) {
+  const [activeProvider, setActiveProvider] = useState("");
+  const providers = [
+    { id: "google", label: "Google", icon: <GoogleMark /> },
+    { id: "microsoft", label: "Microsoft", icon: <MicrosoftMark /> },
+    { id: "apple", label: "Apple", icon: <AppleMark /> },
+  ];
+
+  const handleProviderClick = async (provider) => {
+    setActiveProvider(provider.id);
+    onError("");
+    try {
+      const user = await signInWithSocialProvider(provider.id);
+      onLogin(user);
+    } catch (error) {
+      if (error.code !== "auth/popup-closed-by-user" && error.code !== "auth/cancelled-popup-request") {
+        onError(error.message || `${provider.label} sign-in could not be completed.`);
+      }
+    } finally {
+      setActiveProvider("");
+    }
+  };
+
+  return (
+    <div className="social-auth">
+      <div className="social-auth-divider"><span>or {mode === "register" ? "sign up" : "continue"} with</span></div>
+      <div className="social-auth-buttons">
+        {providers.map((provider) => (
+          <button
+            key={provider.id}
+            type="button"
+            className="social-auth-button"
+            onClick={() => handleProviderClick(provider)}
+            disabled={disabled || Boolean(activeProvider)}
+          >
+            <span className="social-auth-icon" aria-hidden="true">{provider.icon}</span>
+            <span>{activeProvider === provider.id ? "Connecting..." : provider.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(2 2) scale(.92)" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.18l7.66 5.94c4.47-4.13 7.11-10.2 7.11-17.59Z" transform="translate(2 2) scale(.92)" />
+      <path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z" transform="translate(2 2) scale(.92)" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.81l-7.66-5.94c-2.13 1.43-4.86 2.27-8.24 2.27-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z" transform="translate(2 2) scale(.92)" />
+    </svg>
+  );
+}
+
+function MicrosoftMark() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path fill="#f35325" d="M1 1h10v10H1z" />
+      <path fill="#81bc06" d="M13 1h10v10H13z" />
+      <path fill="#05a6f0" d="M1 13h10v10H1z" />
+      <path fill="#ffba08" d="M13 13h10v10H13z" />
+    </svg>
+  );
+}
+
+function AppleMark() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path fill="currentColor" d="M16.37 12.15c.02 2.17 1.9 2.89 1.92 2.9-.02.05-.3 1.03-.98 2.04-.59.87-1.21 1.74-2.18 1.76-.95.02-1.26-.57-2.35-.57s-1.44.55-2.33.59c-.93.03-1.64-.94-2.23-1.81-1.2-1.74-2.12-4.91-.89-7.05.61-1.06 1.7-1.73 2.89-1.75.91-.02 1.77.63 2.33.63.56 0 1.61-.78 2.72-.67.46.02 1.77.18 2.61 1.42-.07.04-1.56.91-1.54 2.51ZM14.58 5.9c.49-.59.82-1.41.73-2.23-.71.03-1.57.47-2.08 1.06-.46.53-.86 1.37-.75 2.17.79.06 1.61-.4 2.1-1Z" />
+    </svg>
+  );
+}
+
+function LoginPage({ onLogin }) {
+  const [formValues, setFormValues] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormValues((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const user = isFirebaseConfigured()
+        ? await signInWithEmailPassword(formValues.email, formValues.password)
+        : await authenticateLocalAccount(formValues.email, formValues.password);
+      if (!user) {
+        setError('Email or password is incorrect. Check your details and try again.');
+        return;
+      }
+      onLogin(user);
+    } catch (loginError) {
+      setError(loginError.message || 'Sign in could not be completed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="page-shell auth-page">
+      <div className="wrap auth-layout">
+        <section className="auth-card">
+          <div className="auth-heading">
+            <span className="eyebrow">Welcome back</span>
+            <h1>Sign in to SkillAI</h1>
+            <p className="auth-copy">Continue to your interviews, assessments, research, and career dashboard.</p>
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <label className="field" htmlFor="login-email">
+              <span>Email address</span>
+              <input id="login-email" className="auth-input" type="email" name="email" autoComplete="username" value={formValues.email} onChange={handleChange} placeholder="you@example.com" required />
+            </label>
+            <label className="field" htmlFor="login-password">
+              <span>Password</span>
+              <span className="auth-password-control">
+                <input id="login-password" className="auth-input" type={showPassword ? "text" : "password"} name="password" autoComplete="current-password" value={formValues.password} onChange={handleChange} placeholder="Enter your password" required />
+                <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </span>
+            </label>
+            {error && <div className="auth-error" role="alert">{error}</div>}
+            <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Sign in'} {!isSubmitting && <ArrowRight size={16} />}</button>
+          </form>
+
+          <SocialAuthButtons mode="login" onLogin={onLogin} onError={setError} disabled={isSubmitting} />
+
+          {!isFirebaseConfigured() && <div className="demo-box">
+            <div className="demo-heading"><strong>Try a demo account</strong><span>Select to fill the sign-in fields</span></div>
+            <div className="demo-grid">
+              {demoCredentials.map(({ label, email, password }) => (
+                <button key={label} type="button" className="demo-chip" onClick={() => setFormValues({ email, password })}>
+                  <strong>{label}</strong>
+                  <span>{email}</span>
+                  <span>Password: {password}</span>
+                </button>
+              ))}
+            </div>
+          </div>}
+
+          <p className="auth-cta">Need an account? <Link to="/register">Create one</Link></p>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function RegisterPage({ onLogin }) {
+  const [formValues, setFormValues] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormValues((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    if (formValues.password !== formValues.confirmPassword) {
+      setError('Passwords do not match. Please check both password fields.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const user = isFirebaseConfigured()
+        ? await registerWithEmailPassword(formValues)
+        : await registerLocalAccount(formValues);
+      onLogin(user);
+    } catch (registerError) {
+      setError(registerError.message || 'Your account could not be created.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="page-shell auth-page">
+      <div className="wrap auth-layout">
+        <section className="auth-card">
+          <span className="eyebrow">Create account</span>
+          <h1>Start your SkillAI journey</h1>
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <label className="field"><span>Full name</span><input className="auth-input" type="text" name="name" autoComplete="name" value={formValues.name} onChange={handleChange} placeholder="Your full name" required /></label>
+            <label className="field"><span>Email</span><input className="auth-input" type="email" name="email" autoComplete="email" value={formValues.email} onChange={handleChange} placeholder="you@example.com" required /></label>
+            <label className="field"><span>Password</span><input className="auth-input" type="password" name="password" autoComplete="new-password" minLength={8} value={formValues.password} onChange={handleChange} placeholder="At least 8 characters" required /></label>
+            <label className="field"><span>Confirm password</span><input className="auth-input" type="password" name="confirmPassword" autoComplete="new-password" minLength={8} value={formValues.confirmPassword} onChange={handleChange} placeholder="Enter your password again" required /></label>
+            {error && <div className="auth-error" role="alert">{error}</div>}
+            <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Create account'} {!isSubmitting && <ArrowRight size={16} />}</button>
+          </form>
+          <SocialAuthButtons mode="register" onLogin={onLogin} onError={setError} disabled={isSubmitting} />
+          <p className="auth-cta">Already have an account? <Link to="/login">Login</Link></p>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function DashboardPage({ user }) {
+  const [activity, setActivity] = useState({ interviews: [], assessments: [] });
+  const [activityError, setActivityError] = useState("");
+  const [isActivityLoaded, setIsActivityLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      setActivity(getDashboardActivity(user.email));
+      setActivityError("");
+    } catch (error) {
+      setActivityError(`Your activity could not be loaded: ${error.message}`);
+    } finally {
+      setIsActivityLoaded(true);
+    }
+  }, [user.email]);
+
+  const interviewScores = activity.interviews.map((item) => item.score);
+  const assessmentScores = activity.assessments.map((item) => item.score);
+  const allScores = [...interviewScores, ...assessmentScores];
+  const average = (scores) => scores.length
+    ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
+    : null;
+  const recentActivity = [
+    ...activity.interviews.map((item) => ({
+      id: `interview-${item.sessionId || item.evaluatedAt}`,
+      title: item.domain ? `${item.domain} interview` : "Practice interview",
+      type: "Interview",
+      score: item.score,
+      date: item.evaluatedAt,
+    })),
+    ...activity.assessments.map((item) => ({
+      id: item.id,
+      title: item.domain || item.course || "Skill assessment",
+      type: "Assessment",
+      score: item.score,
+      date: item.completedAt,
+    })),
+  ].sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0)).slice(0, 4);
+
+  return (
+    <main className="page-shell dashboard-page">
+      <div className="wrap dashboard-shell">
+        <section className="dashboard-main">
+          <header className="dashboard-welcome">
+            <div className="dashboard-welcome-copy">
+              <span className="dashboard-welcome-eyebrow"><Sparkles size={15} /> YOUR SKILLAI WORKSPACE</span>
+              <h1>Welcome back, {user.name.trim().split(/\s+/)[0]}.</h1>
+              <p>Your next step starts here. Practice, track your progress, and keep moving toward your goals.</p>
+            </div>
+            <div className="dashboard-welcome-actions">
+              <Link to="/interview" className="primary-button">Practice interview <ArrowRight size={16} /></Link>
+              <Link to="/assessment" className="dashboard-welcome-secondary">Take assessment <ArrowRight size={16} /></Link>
+            </div>
+            <span className="dashboard-welcome-decoration" aria-hidden="true"><Sparkles size={100} /></span>
+          </header>
+
+          <div className="dashboard-overview-heading">
+            <div><span className="eyebrow">Your progress</span><h2>A little progress adds up.</h2></div>
+            <Link to="/pricing" className="dashboard-plan-link">Explore plans <ArrowRight size={15} /></Link>
+          </div>
+
+          {activityError && <div className="dashboard-data-error" role="alert">Your activity could not be loaded: {activityError}</div>}
+
+          <div className="dashboard-metrics">
+            {[
+              ["Completed interviews", activity.interviews.length],
+              ["Completed assessments", activity.assessments.length],
+              ["Interview average", average(interviewScores) === null ? "—" : `${average(interviewScores)}%`],
+              ["Assessment average", average(assessmentScores) === null ? "—" : `${average(assessmentScores)}%`],
+            ].map(([label, value], index) => (
+              <div key={label} className={`mini-stat dashboard-stat dashboard-stat-${index + 1}`}><span>{label}</span><strong>{isActivityLoaded ? value : "—"}</strong></div>
+            ))}
+          </div>
+
+          <div className="dashboard-grid">
+            <section className="panel-card dashboard-activity-panel">
+              <div className="panel-header"><strong>Recent activity</strong><span>{activity.interviews.length + activity.assessments.length} completed</span></div>
+              {!isActivityLoaded ? (
+                <p className="dashboard-activity-empty">Loading your recent progress...</p>
+              ) : recentActivity.length ? (
+                <div className="dashboard-activity-list">
+                  {recentActivity.map((item) => (
+                    <article key={item.id} className="dashboard-activity-item">
+                      <span className="dashboard-activity-type">{item.type}</span>
+                      <div><strong>{item.title}</strong><small>{item.date ? new Date(item.date).toLocaleDateString() : "Date unavailable"}</small></div>
+                      <strong className="dashboard-activity-score">{item.score}%</strong>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="dashboard-activity-empty">
+                  <span className="dashboard-empty-icon"><Sparkles size={19} /></span>
+                  <strong>Your progress starts with one practice.</strong>
+                  <p>Finish an interview or assessment and your personal results will appear here.</p>
+                </div>
+              )}
+            </section>
+            <section className="panel-card dashboard-next-step">
+              <div className="panel-header"><strong>Pick up where you want to grow</strong></div>
+              <p>{activity.interviews.length === 0
+                ? "Build confidence with a practice interview, or check what you know with a skill assessment."
+                : activity.assessments.length === 0
+                  ? "Take a skill assessment to identify strengths and choose what to learn next."
+                  : "Keep practicing and revisit your latest feedback to build on your progress."}</p>
+              <div className="dashboard-shortcuts">
+                <Link to="/interview" className="dashboard-shortcut">
+                  <span className="dashboard-shortcut-icon"><Sparkles size={18} /></span>
+                  <span><strong>AI Interview</strong><small>Practice with a virtual interviewer</small></span>
+                  <ArrowRight size={16} />
+                </Link>
+                <Link to="/assessment" className="dashboard-shortcut">
+                  <span className="dashboard-shortcut-icon assessment"><BarChart3 size={18} /></span>
+                  <span><strong>Skill Assessment</strong><small>Check your knowledge and skills</small></span>
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="site-footer">
+      <div className="wrap footer-inner">
+        <div className="footer-brand-block">
+          <div className="brand mini-brand">
+            <span className="brand-mark" aria-hidden="true"><Sparkles size={20} strokeWidth={2.1} /></span>
+            <span className="brand-text"><strong>SkillAI</strong><small>Assess. Improve. Grow.</small></span>
+          </div>
+          <p>AI-powered interview readiness, skill intelligence, and career growth support for students, researchers, and professionals.</p>
+        </div>
+
+        <div className="footer-links">
+          <div>
+            <h4>Platform</h4>
+            <Link to="/">Home</Link>
+            <Link to="/domains">Domains</Link>
+            <Link to="/interview">AI Interview</Link>
+            <Link to="/pricing">Pricing</Link>
+          </div>
+          <div>
+            <h4>Learning</h4>
+            <Link to="/assessment">Skill Assessment</Link>
+            <Link to="/research">Research Hub</Link>
+            <Link to="/roadmap">Career Roadmap</Link>
+          </div>
+          <div>
+            <h4>Resources</h4>
+            <Link to="/resources">Resources</Link>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Get Started</Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="wrap footer-bottom">
+        <span>© 2026 SkillAI</span>
+        <span>Privacy</span>
+        <span>Terms</span>
+        <span>Contact</span>
+      </div>
+    </footer>
+  );
+}
+
+function App() {
+  const location = useLocation();
+  const [session, setSession] = useState(() => {
+    try {
+      const storedSession = window.localStorage.getItem('skillai-auth');
+      const user = storedSession ? JSON.parse(storedSession) : null;
+      return isFirebaseConfigured() && user?.authProvider !== "firebase" ? null : user;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (session) {
+      window.localStorage.setItem('skillai-auth', JSON.stringify(session));
+      return;
+    }
+    window.localStorage.removeItem('skillai-auth');
+  }, [session]);
+
+  useEffect(() => {
+    const page = getSeoPage(location.pathname);
+    const canonicalUrl = `${SEO_SITE_URL}${page.path === "/" ? "/" : page.path}`;
+    document.title = page.title;
+
+    const setMetaContent = (selector, content) => {
+      document.head.querySelector(selector)?.setAttribute("content", content);
+    };
+    setMetaContent('meta[name="description"]', page.description);
+    setMetaContent('meta[name="robots"]', page.indexable ? "index, follow" : "noindex, follow");
+    setMetaContent('meta[property="og:title"]', page.title);
+    setMetaContent('meta[property="og:description"]', page.description);
+    setMetaContent('meta[property="og:url"]', canonicalUrl);
+    setMetaContent('meta[name="twitter:title"]', page.title);
+    setMetaContent('meta[name="twitter:description"]', page.description);
+
+    let pageSchema = document.head.querySelector('script[data-seo-page-schema]');
+    if (!pageSchema) {
+      pageSchema = document.createElement("script");
+      pageSchema.type = "application/ld+json";
+      pageSchema.dataset.seoPageSchema = "";
+      document.head.append(pageSchema);
+    }
+    pageSchema.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: page.title,
+      description: page.description,
+      url: canonicalUrl,
+      isPartOf: { "@id": `${SEO_SITE_URL}/#website` },
+      inLanguage: "en-IN",
+    });
+
+    let faqSchema = document.head.querySelector('script[data-seo-faq-schema]');
+    if (page.path === "/assessment") {
+      if (!faqSchema) {
+        faqSchema = document.createElement("script");
+        faqSchema.type = "application/ld+json";
+        faqSchema.dataset.seoFaqSchema = "";
+        document.head.append(faqSchema);
+      }
+      faqSchema.textContent = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: ASSESSMENT_FAQS.map(({ question, answer }) => ({
+          "@type": "Question",
+          name: question,
+          acceptedAnswer: { "@type": "Answer", text: answer },
+        })),
+      });
+    } else {
+      faqSchema?.remove();
+    }
+
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!page.indexable) {
+      canonical?.remove();
+      return;
+    }
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.append(canonical);
+    }
+    canonical.setAttribute("href", canonicalUrl);
+  }, [location.pathname]);
+
+  const handleLogin = (user) => setSession({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    authProvider: user.authProvider,
+  });
+  const handleLogout = async () => {
+    if (session?.authProvider === "firebase") await signOutFirebaseUser();
+    setSession(null);
+  };
+  const requestedPath = typeof location.state?.from === "string"
+    && location.state.from.startsWith("/")
+    && !location.state.from.startsWith("//")
+    ? location.state.from
+    : "/dashboard";
+  const resumePage = (
+    <Suspense fallback={<main className="page-shell ri-page"><div className="wrap">Loading Resume Intelligence…</div></main>}>
+      <ResumeIntelligence key={session?.id} user={session} />
+    </Suspense>
+  );
+  const loginRequired = (
+    <Navigate
+      to="/login"
+      replace
+      state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+    />
+  );
+
+  return (
+    <>
+      <Navbar user={session} onLogout={handleLogout} />
+      <main className="page-main">
+        <Routes>
+          <Route path="/" element={session ? <DashboardPage user={session} /> : <HomePage />} />
+          <Route path="/domains" element={<DomainsPage />} />
+          <Route path="/interview" element={<InterviewPage />} />
+          <Route path="/interview/start" element={<Suspense fallback={<main className="page-shell interview-experience"><div className="wrap">Loading interview setup...</div></main>}><InterviewExperiencePage /></Suspense>} />
+          <Route path="/resume" element={session ? resumePage : loginRequired} />
+          <Route path="/resume/:section" element={session ? resumePage : loginRequired} />
+          <Route path="/assessment" element={<AssessmentPage />} />
+          <Route path="/assessment/start" element={<Suspense fallback={<main className="page-shell skill-assessment-page"><div className="wrap">Loading your assessment...</div></main>}><SkillAssessmentPage /></Suspense>} />
+          <Route path="/research" element={<ResearchPage />} />
+          <Route path="/research/maker" element={<ResearchMakerPage />} />
+          <Route path="/roadmap" element={<RoadmapPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
+          <Route path="/pricing" element={<PricingPage user={session} onLogout={handleLogout} />} />
+          <Route path="/login" element={session ? <Navigate to={requestedPath} replace /> : <LoginPage onLogin={handleLogin} />} />
+          <Route path="/register" element={session ? <Navigate to={requestedPath} replace /> : <RegisterPage onLogin={handleLogin} />} />
+          <Route path="/dashboard" element={session ? <DashboardPage user={session} /> : <Navigate to="/login" replace />} />
+          <Route path="*" element={<HomePage />} />
+        </Routes>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+export default App;

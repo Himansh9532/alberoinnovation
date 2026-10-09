@@ -1,0 +1,11 @@
+{
+  "name": "robotics-lab-api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
