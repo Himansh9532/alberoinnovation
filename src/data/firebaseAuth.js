@@ -69,7 +69,11 @@ export async function getFirebaseIdToken() {
   const auth = getFirebaseAuth();
   await auth.authStateReady();
   const user = auth.currentUser;
-  if (!user) throw new Error("Please sign in with Firebase to use your plan.");
+  if (!user) {
+    throw Object.assign(new Error("Please sign in to your SkillAI account to use AI paper help and plan features."), {
+      code: "AUTH_REQUIRED",
+    });
+  }
   return user.getIdToken();
 }
 

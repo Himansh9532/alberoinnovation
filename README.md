@@ -32,6 +32,12 @@ The Skill Assessment page's Get started link opens a separate quiz flow. Choosin
 
 Each paper result can be summarized or used for up to three follow-up questions in that page session. The assistant sends only the paper title, source metadata, abstract, and the current short conversation to the backend Gemini endpoint; it does not fetch or read the full paper. The server keeps the Gemini API key private, requires Firebase sign-in, enforces monthly plan quotas transactionally, limits request size, and rate-limits research AI requests. Plus includes 10 and Pro includes 30 AI paper requests per UTC calendar month; Free can browse papers but AI paper help requires a paid plan.
 
+OpenAlex metadata may retain links to repository records that were later removed. The search hides records OpenAlex explicitly marks as retracted, avoids presenting a repository landing page as a direct PDF, and offers a title search for other versions; external links should still be checked at the source.
+
+Research searches can be saved in the browser and reloaded later. My Library can save up to 200 papers, keep To read/Reading/Done status and private notes, and export citations as BibTeX or RIS for reference managers. Saved searches, library items, and notes are stored only in that browser on that device; they are not synced to an account, and email alerts are not enabled.
+
+Research Maker creates a local planning template with an editable research question, methodology-specific guidance, population or dataset context, keywords, objectives, evidence criteria, a starter search query, and format-specific section guidance. Plans can be downloaded as text. It does not call an AI model, search or verify sources, or write a finished paper.
+
 For local development, copy `backend/.env.example` to `backend/.env` and set `GEMINI_API_KEY` to a key from Google AI Studio. The key is read only by the backend; do not add it to a `VITE_` variable or commit it. `GEMINI_MODEL` can optionally select a different model.
 
 For deployment, add `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) as server-side backend environment variables. The key must never be exposed in client-side configuration.

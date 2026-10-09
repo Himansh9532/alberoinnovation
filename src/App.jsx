@@ -50,6 +50,10 @@ const SkillAssessmentPage = lazy(() => import("./components/SkillAssessment"));
 const ResumeIntelligence = lazy(() => import("./components/ResumeIntelligence"));
 
 const SEO_SITE_URL = "https://www.alberotechnologies.in";
+const SAVED_RESEARCH_SEARCHES_KEY = "skillai-research-saved-searches";
+const RESEARCH_LIBRARY_KEY = "skillai-research-library";
+const RESEARCH_LIBRARY_LIMIT = 200;
+const REMOVED_ZENODO_DOIS = new Set(["10.5281/zenodo.7414343"]);
 const SEO_PAGES = {
   "/": {
     title: "Online Skill Assessments & Career Tools | SkillAI",
@@ -939,6 +943,113 @@ function getOpenAlexAbstract(invertedIndex) {
   return words.filter(Boolean).join(" ").replace(/\s+([.,;:!?])/g, "$1");
 }
 
+function normalizeLinkForComparison(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return "";
+  }
+}
+
+function isRemovedRepositoryRecord(paper) {
+  const normalizedDoi = String(paper?.doi || "").replace(/^https?:\/\/doi\.org\//i, "").toLowerCase();
+  return REMOVED_ZENODO_DOIS.has(normalizedDoi);
+}
+
+function getScholarSearchUrl(title) {
+  return `https://scholar.google.com/scholar?q=${encodeURIComponent(`"${title || ""}"`)}`;
+}
+
+function getDirectPdfUrl(location) {
+  const pdfUrl = location?.pdf_url;
+  if (typeof pdfUrl !== "string" || !/^https?:\/\//i.test(pdfUrl)) return "";
+  if (normalizeLinkForComparison(pdfUrl) === normalizeLinkForComparison(location?.landing_page_url)) return "";
+  return pdfUrl;
+}
+
+function isSavedResearchSearch(value) {
+  return value
+    && typeof value.id === "string"
+    && typeof value.name === "string"
+    && value.filters
+    && typeof value.filters === "object"
+    && typeof value.filters.branch === "string"
+    && Object.hasOwn(academicPaths, value.filters.branch);
+}
+
+function isResearchLibraryItem(value) {
+  return value
+    && typeof value.id === "string"
+    && typeof value.title === "string"
+    && typeof value.year === "number"
+    && Array.isArray(value.authors)
+    && value.authors.every((author) => typeof author === "string")
+    && typeof value.journal === "string"
+    && typeof value.sourceUrl === "string"
+    && typeof value.doi === "string"
+    && typeof value.pdfUrl === "string"
+    && typeof value.status === "string"
+    && ["To read", "Reading", "Done"].includes(value.status)
+    && typeof value.notes === "string";
+}
+
+function escapeBibTeX(value) {
+  const replacements = {
+    "\\": "\\textbackslash{}",
+    "&": "\\&",
+    "%": "\\%",
+    "$": "\\$",
+    "#": "\\#",
+    "_": "\\_",
+    "{": "\\{",
+    "}": "\\}",
+  };
+  return String(value || "").replace(/[\\&%$#_{}]/g, (character) => replacements[character]);
+}
+
+function cleanCitationField(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
+function createCitationFile(papers, format) {
+  const entries = papers.map((paper, index) => {
+    const title = cleanCitationField(paper.title);
+    const authors = paper.authors.map(cleanCitationField).filter(Boolean).join(format === "ris" ? "\nAU  - " : " and ");
+    const journal = cleanCitationField(paper.journal);
+    const doi = cleanCitationField(paper.doi).replace(/^https?:\/\/doi\.org\//, "");
+    const sourceUrl = cleanCitationField(paper.sourceUrl);
+    if (format === "ris") {
+      return [
+        "TY  - JOUR",
+        `ID  - ${cleanCitationField(paper.id)}`,
+        `TI  - ${title}`,
+        authors ? `AU  - ${authors}` : "",
+        paper.year ? `PY  - ${paper.year}` : "",
+        journal ? `JO  - ${journal}` : "",
+        doi ? `DO  - ${doi}` : "",
+        `UR  - ${sourceUrl}`,
+        "ER  - ",
+      ].filter(Boolean).join("\n");
+    }
+
+    const firstAuthor = cleanCitationField(paper.authors[0]).split(/\s+/).pop() || "paper";
+    const titleSlug = title.split(/\s+/).slice(0, 3).join("");
+    const citationKey = `${firstAuthor}${paper.year || ""}${titleSlug}${index + 1}`.replace(/[^A-Za-z0-9]/g, "") || `paper${index + 1}`;
+    return [
+      "@misc{" + citationKey + ",",
+      `  title = {${escapeBibTeX(title)}},`,
+      authors ? `  author = {${escapeBibTeX(authors)}},` : "",
+      paper.year ? `  year = {${paper.year}},` : "",
+      journal ? `  howpublished = {${escapeBibTeX(journal)}},` : "",
+      doi ? `  doi = {${escapeBibTeX(doi)}},` : "",
+      `  url = {${escapeBibTeX(sourceUrl)}}`,
+      "}",
+    ].filter(Boolean).join("\n");
+  });
+  return entries.join(format === "ris" ? "\n\n" : "\n\n");
+}
+
 function ResearchPaperAssistant({ paper }) {
   const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState("");
@@ -948,11 +1059,13 @@ function ResearchPaperAssistant({ paper }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [upgradeRequired, setUpgradeRequired] = useState(false);
+  const [signInRequired, setSignInRequired] = useState(false);
   const canAsk = Boolean(paper.abstract) && questionCount < 3 && !isLoading;
 
   const requestAssistant = async (action, askedQuestion = "") => {
     setError("");
     setUpgradeRequired(false);
+    setSignInRequired(false);
     setIsLoading(true);
     try {
       const token = await getFirebaseIdToken();
@@ -987,6 +1100,7 @@ function ResearchPaperAssistant({ paper }) {
       }
     } catch (requestError) {
       setError(requestError.message || "Research AI could not answer. Please try again.");
+      setSignInRequired(requestError.code === "AUTH_REQUIRED");
     } finally {
       setIsLoading(false);
     }
@@ -1060,7 +1174,7 @@ function ResearchPaperAssistant({ paper }) {
             </form>
           )}
           {isLoading && <p className="research-ai-loading" role="status">Reading the abstract and preparing a grounded answer…</p>}
-          {error && <div className="research-search-error" role="alert"><p>{error}</p>{upgradeRequired && <Link to="/pricing">View plans</Link>}</div>}
+          {error && <div className="research-search-error" role="alert"><p>{error}</p>{signInRequired && <Link to="/login">Sign in to SkillAI</Link>}{upgradeRequired && <Link to="/pricing">View plans</Link>}</div>}
         </section>
       )}
     </div>
@@ -1084,12 +1198,170 @@ function ResearchPage() {
   });
   const [papers, setPapers] = useState([]);
   const [searchError, setSearchError] = useState("");
+  const [excludedRetractedCount, setExcludedRetractedCount] = useState(0);
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [savedSearchName, setSavedSearchName] = useState("");
+  const [savedSearchMessage, setSavedSearchMessage] = useState("");
+  const [researchLibrary, setResearchLibrary] = useState([]);
+  const [libraryMessage, setLibraryMessage] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchController = useRef(null);
   const yearOptions = Array.from({ length: currentYear - 1949 }, (_, index) => String(currentYear - index));
 
   useEffect(() => () => searchController.current?.abort(), []);
+
+  useEffect(() => {
+    try {
+      const serialized = window.localStorage.getItem(SAVED_RESEARCH_SEARCHES_KEY);
+      if (!serialized) return;
+
+      const storedSearches = JSON.parse(serialized);
+      if (!Array.isArray(storedSearches)) throw new Error("Saved searches have an invalid format.");
+      const validSearches = storedSearches.filter(isSavedResearchSearch);
+      setSavedSearches(validSearches.slice(0, 50));
+      if (validSearches.length !== storedSearches.length) {
+        setSavedSearchMessage("Some saved searches were skipped because their saved data is invalid.");
+      }
+      if (validSearches.length > 50) {
+        setSavedSearchMessage("Showing the 50 most recent saved searches.");
+      }
+    } catch (error) {
+      setSavedSearchMessage(error instanceof Error ? error.message : "Saved searches could not be loaded.");
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const serialized = window.localStorage.getItem(RESEARCH_LIBRARY_KEY);
+      if (!serialized) return;
+
+      const storedItems = JSON.parse(serialized);
+      if (!Array.isArray(storedItems)) throw new Error("Your research library has an invalid format.");
+      const validItems = storedItems.filter(isResearchLibraryItem);
+      setResearchLibrary(validItems.slice(0, RESEARCH_LIBRARY_LIMIT));
+      if (validItems.length !== storedItems.length) {
+        setLibraryMessage("Some saved papers were skipped because their saved data is invalid.");
+      } else if (validItems.length > RESEARCH_LIBRARY_LIMIT) {
+        setLibraryMessage(`Showing the ${RESEARCH_LIBRARY_LIMIT} most recently saved papers.`);
+      }
+    } catch (error) {
+      setLibraryMessage(error instanceof Error ? error.message : "Your research library could not be loaded.");
+    }
+  }, []);
+
+  const persistResearchLibrary = (nextLibrary, message) => {
+    try {
+      window.localStorage.setItem(RESEARCH_LIBRARY_KEY, JSON.stringify(nextLibrary));
+      setResearchLibrary(nextLibrary);
+      setLibraryMessage(message);
+    } catch {
+      setLibraryMessage("Could not update your library in this browser. Check available storage and try again.");
+    }
+  };
+
+  const savePaperToLibrary = (paper) => {
+    if (researchLibrary.some((item) => item.id === paper.id)) {
+      setLibraryMessage("This paper is already in your library.");
+      return;
+    }
+    if (researchLibrary.length >= RESEARCH_LIBRARY_LIMIT) {
+      setLibraryMessage(`Your library can hold up to ${RESEARCH_LIBRARY_LIMIT} papers. Remove a paper before adding another.`);
+      return;
+    }
+
+    const libraryItem = {
+      id: paper.id,
+      title: paper.title,
+      year: paper.year || 0,
+      authors: paper.authors || [],
+      journal: paper.journal || "",
+      doi: paper.doi || "",
+      sourceUrl: paper.sourceUrl || paper.id,
+      pdfUrl: paper.pdfUrl || "",
+      status: "To read",
+      notes: "",
+      savedAt: new Date().toISOString(),
+    };
+    persistResearchLibrary([libraryItem, ...researchLibrary], `Saved "${paper.title}" to My Library.`);
+  };
+
+  const updateLibraryItem = (itemId, updates) => {
+    const nextLibrary = researchLibrary.map((item) => item.id === itemId ? { ...item, ...updates } : item);
+    persistResearchLibrary(nextLibrary, "My Library updated.");
+  };
+
+  const removeLibraryItem = (itemId) => {
+    persistResearchLibrary(researchLibrary.filter((item) => item.id !== itemId), "Paper removed from My Library.");
+  };
+
+  const exportCitations = (format) => {
+    if (researchLibrary.length === 0) {
+      setLibraryMessage("Save a paper to My Library before exporting citations.");
+      return;
+    }
+    const extension = format === "ris" ? "ris" : "bib";
+    const mimeType = format === "ris" ? "application/x-research-info-systems" : "application/x-bibtex";
+    const blobUrl = URL.createObjectURL(new Blob([createCitationFile(researchLibrary, format)], { type: `${mimeType};charset=utf-8` }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `skillai-research-library.${extension}`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+    setLibraryMessage(`Exported ${researchLibrary.length} citation${researchLibrary.length === 1 ? "" : "s"} as ${format.toUpperCase()}.`);
+  };
+
+  const persistSavedSearches = (nextSearches, message) => {
+    try {
+      window.localStorage.setItem(SAVED_RESEARCH_SEARCHES_KEY, JSON.stringify(nextSearches));
+      setSavedSearches(nextSearches);
+      setSavedSearchMessage(message);
+    } catch {
+      setSavedSearchMessage("Could not update saved searches in this browser. Check available storage and try again.");
+    }
+  };
+
+  const saveCurrentSearch = (event) => {
+    event.preventDefault();
+    const name = savedSearchName.trim();
+    if (!name) {
+      setSavedSearchMessage("Enter a name for this search.");
+      return;
+    }
+
+    const existingSearch = savedSearches.find((search) => search.name.toLowerCase() === name.toLowerCase());
+    const nextSearch = {
+      id: existingSearch?.id || `research-${Date.now()}`,
+      name,
+      filters: { ...form },
+      updatedAt: new Date().toISOString(),
+    };
+    const nextSearches = [nextSearch, ...savedSearches.filter((search) => search.id !== nextSearch.id)].slice(0, 50);
+    persistSavedSearches(nextSearches, `Saved "${name}".`);
+    setSavedSearchName("");
+  };
+
+  const applySavedSearch = (search) => {
+    const branch = search.filters.branch;
+    const path = academicPaths[branch];
+    setForm({
+      branch,
+      course: path.courses.includes(search.filters.course) ? search.filters.course : path.courses[0],
+      domain: path.domains.includes(search.filters.domain) ? search.filters.domain : path.domains[0],
+      keywords: typeof search.filters.keywords === "string" ? search.filters.keywords : "",
+      fromYear: typeof search.filters.fromYear === "string" ? search.filters.fromYear : String(Math.max(1949, currentYear - 4)),
+      toYear: typeof search.filters.toYear === "string" ? search.filters.toYear : String(currentYear),
+      workType: typeof search.filters.workType === "string" ? search.filters.workType : "article",
+      sort: typeof search.filters.sort === "string" ? search.filters.sort : "relevance_score:desc",
+      openAccessOnly: search.filters.openAccessOnly === true,
+      resultLimit: ["20", "50", "100"].includes(search.filters.resultLimit) ? search.filters.resultLimit : "20",
+    });
+    setSavedSearchMessage(`Loaded "${search.name}". Select Find research papers to run it.`);
+  };
+
+  const removeSavedSearch = (searchId) => {
+    persistSavedSearches(savedSearches.filter((search) => search.id !== searchId), "Saved search removed.");
+  };
 
   const handleBranchChange = (event) => {
     const branch = event.target.value;
@@ -1122,6 +1394,7 @@ function ResearchPage() {
   const handleSearch = async (event) => {
     event.preventDefault();
     setSearchError("");
+    setExcludedRetractedCount(0);
     setPapers([]);
     setHasSearched(false);
 
@@ -1142,7 +1415,7 @@ function ResearchPage() {
       filter: filters.join(","),
       "per-page": form.resultLimit,
       sort: form.sort,
-      select: "id,doi,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,abstract_inverted_index",
+      select: "id,doi,title,publication_year,authorships,primary_location,best_oa_location,open_access,is_retracted,cited_by_count,abstract_inverted_index",
     });
 
     try {
@@ -1158,7 +1431,9 @@ function ResearchPage() {
       if (!Array.isArray(data.results)) {
         throw new Error("The scholarly search service returned an unexpected response.");
       }
-      setPapers(data.results.map((paper) => ({
+      const availablePapers = data.results.filter((paper) => paper.is_retracted !== true);
+      setExcludedRetractedCount(data.results.length - availablePapers.length);
+      setPapers(availablePapers.map((paper) => ({
         id: paper.id,
         title: paper.title || "Untitled research work",
         year: paper.publication_year,
@@ -1169,11 +1444,15 @@ function ResearchPage() {
           || paper.primary_location?.landing_page_url
           || paper.doi
           || paper.id,
-        pdfUrl: paper.best_oa_location?.pdf_url || paper.primary_location?.pdf_url || "",
+        pdfUrl: isRemovedRepositoryRecord(paper)
+          ? ""
+          : getDirectPdfUrl(paper.best_oa_location) || getDirectPdfUrl(paper.primary_location),
+        alternateSearchUrl: getScholarSearchUrl(paper.title),
+        sourceUnavailable: isRemovedRepositoryRecord(paper),
         isOpenAccess: Boolean(paper.open_access?.is_oa),
         citations: Number.isFinite(paper.cited_by_count) ? paper.cited_by_count : 0,
         abstract: getOpenAlexAbstract(paper.abstract_inverted_index),
-      })));
+      })).sort((first, second) => Number(Boolean(second.pdfUrl)) - Number(Boolean(first.pdfUrl))));
       setHasSearched(true);
     } catch (error) {
       if (error.name !== "AbortError") {
@@ -1228,7 +1507,7 @@ function ResearchPage() {
           <div className="section-heading">
             <span className="eyebrow">Paper finder</span>
             <h2>Choose your academic area.</h2>
-            <p>Results are retrieved from OpenAlex. Search results include a source link; direct PDF downloads are shown only when the source provides an open-access PDF.</p>
+            <p>Find relevant research faster. Filter by subject, publication year, work type, and open access, then save papers to your library or export citations.</p>
           </div>
           <form className="research-search-form" onSubmit={handleSearch}>
             <label className="research-filter" htmlFor="paper-branch">
@@ -1304,6 +1583,41 @@ function ResearchPage() {
             </button>
           </form>
           {searchError && <p className="research-search-error" role="alert">{searchError}</p>}
+          <section className="research-saved-searches" aria-labelledby="saved-searches-heading">
+            <div className="research-saved-search-form">
+              <label className="research-filter" htmlFor="saved-search-name">
+                <span id="saved-searches-heading">Save this search</span>
+                <input
+                  id="saved-search-name"
+                  type="text"
+                  maxLength={50}
+                  value={savedSearchName}
+                  onChange={(event) => setSavedSearchName(event.target.value)}
+                  placeholder="e.g. Recent AI reviews"
+                />
+              </label>
+              <button type="button" className="secondary-button" onClick={saveCurrentSearch}>
+                Save search
+              </button>
+            </div>
+            <p className="research-saved-search-note">Saved searches stay in this browser on this device only. Email alerts are not enabled.</p>
+            {savedSearchMessage && <p className="research-saved-search-message" role="status">{savedSearchMessage}</p>}
+            {savedSearches.length > 0 && (
+              <ul className="research-saved-search-list" aria-label="Your saved research searches">
+                {savedSearches.map((search) => (
+                  <li key={search.id}>
+                    <button type="button" className="research-saved-search-load" onClick={() => applySavedSearch(search)}>
+                      <strong>{search.name}</strong>
+                      <span>{search.filters.branch} · {search.filters.course || "All courses"} · {search.filters.fromYear || "Any year"}–{search.filters.toYear || "present"}</span>
+                    </button>
+                    <button type="button" className="research-saved-search-remove" onClick={() => removeSavedSearch(search.id)} aria-label={`Remove saved search ${search.name}`}>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
 
         {isSearching && (
@@ -1311,6 +1625,69 @@ function ResearchPage() {
             <LoaderCircle size={32} className="research-spinner research-spinner-large" aria-hidden="true" />
           </div>
         )}
+        <section className="research-library" aria-labelledby="research-library-heading">
+          <div className="research-library-header">
+            <div>
+              <span className="eyebrow">Your collection</span>
+              <h2 id="research-library-heading">My Library <span>({researchLibrary.length})</span></h2>
+              <p>Save papers, track reading progress, and keep private notes in this browser.</p>
+            </div>
+            <div className="research-library-exports">
+              <button type="button" className="secondary-button" onClick={() => exportCitations("bib")} disabled={!researchLibrary.length}>
+                <FileText size={16} /> Export BibTeX
+              </button>
+              <button type="button" className="secondary-button" onClick={() => exportCitations("ris")} disabled={!researchLibrary.length}>
+                <FileText size={16} /> Export RIS
+              </button>
+            </div>
+          </div>
+          <p className="research-library-note">Library and notes are stored only on this device; they are not synced to an account.</p>
+          {libraryMessage && <p className="research-saved-search-message" role="status">{libraryMessage}</p>}
+          {researchLibrary.length === 0 ? (
+            <div className="research-no-results"><p>Your library is empty. Add papers from search results to organize them here.</p></div>
+          ) : (
+            <div className="research-library-list">
+              {researchLibrary.map((paper) => (
+                <article className="research-library-card" key={paper.id}>
+                  <div className="research-library-paper">
+                    <h3>
+                      <a href={isRemovedRepositoryRecord(paper) ? getScholarSearchUrl(paper.title) : paper.sourceUrl} target="_blank" rel="noreferrer">
+                        {paper.title}
+                      </a>
+                    </h3>
+                    <p>{paper.authors.slice(0, 4).join(", ")}{paper.authors.length > 4 ? ` + ${paper.authors.length - 4} more` : ""}</p>
+                    <p>{paper.journal}{paper.year ? ` · ${paper.year}` : ""}{paper.doi ? ` · DOI: ${paper.doi.replace(/^https?:\/\/doi\.org\//, "")}` : ""}</p>
+                    {isRemovedRepositoryRecord(paper) && <p>This Zenodo record was removed. The title opens a search for other versions.</p>}
+                  </div>
+                  <div className="research-library-controls">
+                    <label className="research-filter" htmlFor={`library-status-${paper.id}`}>
+                      <span>Reading status</span>
+                      <select id={`library-status-${paper.id}`} value={paper.status} onChange={(event) => updateLibraryItem(paper.id, { status: event.target.value })}>
+                        <option>To read</option>
+                        <option>Reading</option>
+                        <option>Done</option>
+                      </select>
+                    </label>
+                    <label className="research-filter" htmlFor={`library-notes-${paper.id}`}>
+                      <span>Private notes</span>
+                      <textarea
+                        id={`library-notes-${paper.id}`}
+                        value={paper.notes}
+                        maxLength={2000}
+                        onChange={(event) => updateLibraryItem(paper.id, { notes: event.target.value })}
+                        placeholder="Add your research notes..."
+                        rows={3}
+                      />
+                    </label>
+                  </div>
+                  <button type="button" className="research-saved-search-remove research-library-remove" onClick={() => removeLibraryItem(paper.id)}>
+                    Remove from library
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
         {hasSearched && (
           <section className="research-results" aria-live="polite">
             <div className="research-results-header">
@@ -1318,6 +1695,7 @@ function ResearchPage() {
                 <span className="eyebrow">Search results</span>
                 <h2>{papers.length ? `${papers.length} papers found` : "No papers found"}</h2>
                 <p>{form.domain} · {form.course} · {form.fromYear}–{form.toYear}{form.openAccessOnly ? " · Open access" : ""}</p>
+                {excludedRetractedCount > 0 && <p>{excludedRetractedCount} record{excludedRetractedCount === 1 ? "" : "s"} marked as retracted were hidden.</p>}
               </div>
               {papers.length > 0 && (
                 <button type="button" className="secondary-button research-export-button" onClick={downloadResults}>
@@ -1327,7 +1705,9 @@ function ResearchPage() {
             </div>
             {papers.length === 0 ? (
               <div className="research-no-results">
-                <p>No matching papers were returned. Try broadening the date range, changing the work type, or using related keywords.</p>
+                <p>{excludedRetractedCount > 0
+                  ? "All returned records were marked as retracted and hidden. Try another query."
+                  : "No matching papers were returned. Try broadening the date range, changing the work type, or using related keywords."}</p>
               </div>
             ) : (
               <div className="research-paper-list">
@@ -1342,20 +1722,39 @@ function ResearchPage() {
                     <p className="research-result-authors">{paper.authors.slice(0, 4).join(", ")}{paper.authors.length > 4 ? ` + ${paper.authors.length - 4} more` : ""}</p>
                     <p className="research-result-journal">{paper.journal}</p>
                     {paper.abstract && <p className="research-result-abstract">{paper.abstract}</p>}
+                    <button
+                      type="button"
+                      className="secondary-button research-library-save"
+                      onClick={() => savePaperToLibrary(paper)}
+                      disabled={researchLibrary.some((item) => item.id === paper.id)}
+                    >
+                      {researchLibrary.some((item) => item.id === paper.id) ? "Saved in My Library" : "Add to My Library"}
+                    </button>
                     <ResearchPaperAssistant paper={paper} />
                     {paper.doi && <p className="research-result-doi">DOI: {paper.doi.replace(/^https?:\/\/doi\.org\//, "")}</p>}
                     <div className="research-result-actions">
-                      <a className="secondary-button" href={paper.sourceUrl} target="_blank" rel="noreferrer">
-                        View source <ExternalLink size={15} />
-                      </a>
-                      {paper.pdfUrl ? (
+                      {!paper.sourceUnavailable && (
+                        <a className="secondary-button" href={paper.sourceUrl} target="_blank" rel="noreferrer">
+                          View source <ExternalLink size={15} />
+                        </a>
+                      )}
+                      {paper.pdfUrl && (
                         <a className="primary-button" href={paper.pdfUrl} target="_blank" rel="noreferrer">
                           Open / download PDF <Download size={15} />
                         </a>
-                      ) : (
-                        <span className="research-pdf-unavailable">No direct open-access PDF listed</span>
                       )}
                     </div>
+                    {!paper.pdfUrl && <p className="research-pdf-unavailable-note">No direct open-access PDF listed.</p>}
+                    <div className="research-result-alternate-actions">
+                      <a className="secondary-button" href={paper.alternateSearchUrl} target="_blank" rel="noreferrer">
+                        Find other versions <ExternalLink size={15} />
+                      </a>
+                    </div>
+                    <p className="research-result-link-note">
+                      {paper.sourceUnavailable
+                        ? "This Zenodo record was removed. Check other versions using the link below."
+                        : "Repository copies can be removed while search indexes still show old links. Check another version if the source is unavailable."}
+                    </p>
                   </article>
                 ))}
               </div>
@@ -1369,7 +1768,18 @@ function ResearchPage() {
 }
 
 function ResearchMakerPage() {
-  const [form, setForm] = useState({ topic: "", discipline: "Computer Science", format: "Research paper" });
+  const [form, setForm] = useState({
+    topic: "",
+    question: "",
+    discipline: "Computer Science",
+    format: "Research paper",
+    method: "Mixed methods",
+    context: "",
+    keywords: "",
+    inclusionCriteria: "",
+    exclusionCriteria: "",
+    objectives: "",
+  });
   const [outline, setOutline] = useState(null);
 
   const handleSubmit = (event) => {
@@ -1377,46 +1787,108 @@ function ResearchMakerPage() {
     const topic = form.topic.trim();
     if (!topic) return;
 
-    const questions = {
-      "Research paper": `How does ${topic} influence current practices and outcomes in ${form.discipline}?`,
-      "Literature review": `What does existing research show about ${topic} in ${form.discipline}?`,
-      "Case study": `How does ${topic} shape practice in a specific ${form.discipline} context?`,
-    };
-    const approaches = {
-      "Research paper": "Choose qualitative, quantitative, or mixed methods that directly answer your research question. Define your data, participants, and analysis before collecting evidence.",
-      "Literature review": "Set a reproducible search strategy, choose relevant scholarly databases, and define inclusion criteria. Compare and synthesize findings rather than summarizing sources one by one.",
-      "Case study": "Select a clearly bounded case and combine appropriate evidence sources, such as documents, observations, or interviews. Explain how the case was selected and analyzed.",
-    };
     const sections = {
       "Research paper": [
-        ["Introduction", "Set the context, explain why the topic matters, and state the research question."],
-        ["Background and related work", "Review relevant evidence and identify the specific gap your study addresses."],
-        ["Methodology", "Describe the design, data sources, sampling, procedure, and analysis."],
-        ["Results and discussion", "Present findings clearly, interpret them against prior research, and note limitations."],
-        ["Conclusion", "Answer the research question and outline implications and future work."],
+        ["Introduction and problem statement", "Establish the context, explain who is affected, and support the problem with credible evidence."],
+        ["Literature and research gap", "Synthesize relevant studies, compare their findings, and state the specific gap this project will address."],
+        ["Research aim and objectives", "Translate the question into focused, measurable objectives that can be completed with available evidence."],
+        ["Methodology and ethics", "Explain the design, data or participants, sampling, instruments, analysis, consent, and privacy safeguards."],
+        ["Results, discussion, and limitations", "Report evidence transparently, relate findings to prior work, and describe uncertainty and limitations."],
+        ["Conclusion and implications", "Answer the research question and state practical implications and future research."],
       ],
       "Literature review": [
-        ["Introduction and scope", "Define the topic, review question, boundaries, and why the review is needed."],
-        ["Search and selection method", "Document databases, search terms, dates, and inclusion or exclusion criteria."],
-        ["Thematic synthesis", "Group studies by themes, methods, or findings and compare their evidence."],
-        ["Research gaps", "Identify where evidence is limited, inconsistent, or missing."],
-        ["Conclusion", "Summarize what the literature establishes and recommend next research steps."],
+        ["Review question and scope", "Define the population or subject, concepts, context, date range, and type of evidence covered."],
+        ["Search protocol", "Record databases, search date, exact search strings, and any filters so another researcher can reproduce the search."],
+        ["Eligibility and screening", "Apply predefined inclusion and exclusion criteria; track duplicate removal and reasons for excluding records."],
+        ["Evidence extraction and appraisal", "Capture each study's design, sample, setting, measures, findings, limitations, and quality considerations."],
+        ["Thematic synthesis", "Compare evidence across studies, explain agreement or disagreement, and avoid treating a study count as proof."],
+        ["Research gaps and conclusion", "Summarize what is established, what remains uncertain, and which questions merit further study."],
       ],
       "Case study": [
-        ["Case context", "Describe the setting, case boundaries, and reason for selecting it."],
-        ["Case question and framework", "State the question and concepts that guide your analysis."],
-        ["Evidence and methods", "Explain sources, collection procedures, and how evidence will be analyzed."],
-        ["Findings and interpretation", "Present key observations and connect them to the framework and related research."],
-        ["Conclusion and limitations", "Summarize insights, transferability, limitations, and possible next steps."],
+        ["Case selection and boundaries", "Define the case, setting, timeframe, unit of analysis, and reason for selecting it."],
+        ["Question and analytical framework", "State the case question and define the concepts or framework used to interpret evidence."],
+        ["Evidence sources and methods", "Describe documents, observations, interviews, or datasets, how they will be selected, and how evidence will be triangulated."],
+        ["Findings and interpretation", "Present evidence by theme or timeline and distinguish direct observations from interpretation."],
+        ["Ethics, limitations, and transferability", "Address consent and privacy, explain limits of the case, and state where insights may or may not apply."],
+        ["Conclusion", "Answer the case question and identify practical implications or follow-up questions."],
+      ],
+      "Systematic review": [
+        ["Protocol and review question", "Specify the review question, protocol, scope, and whether the protocol will be registered."],
+        ["Search strategy", "List databases, platforms, search dates, full search strings, and supplementary search methods."],
+        ["Eligibility and study selection", "Define inclusion and exclusion criteria, screening stages, duplicate handling, and exclusion reasons."],
+        ["Data extraction and risk of bias", "Predefine extracted fields and an appropriate critical appraisal or risk-of-bias tool."],
+        ["Synthesis", "Choose a synthesis method suited to the evidence; explain heterogeneity and avoid unsupported pooling."],
+        ["Reporting and limitations", "Document the selection flow, evidence limitations, protocol deviations, and conclusions."],
+      ],
+      "Research proposal": [
+        ["Background and problem", "Explain the context, affected stakeholders, evidence-backed problem, and why it merits investigation."],
+        ["Question, aim, and objectives", "Set one answerable main question and aligned objectives that define the project's boundaries."],
+        ["Literature and rationale", "Summarize relevant evidence and explain how the proposed project addresses a genuine gap."],
+        ["Methods, feasibility, and ethics", "Describe design, data access, analysis, resources, timeline, risks, and required ethical approvals."],
+        ["Expected contribution and limitations", "State the intended contribution without promising results and identify foreseeable limitations."],
+      ],
+      "Thesis": [
+        ["Introduction and research problem", "Establish the topic, research problem, scope, significance, and main question."],
+        ["Critical literature review", "Organize prior work by themes, methods, and debates; identify the gap your thesis addresses."],
+        ["Conceptual or theoretical framework", "Define key concepts and explain the framework that guides the study."],
+        ["Methods and ethical considerations", "Document design, sampling, instruments, analysis, consent, privacy, and reproducibility."],
+        ["Findings and discussion", "Present results clearly and interpret them in relation to the question and literature."],
+        ["Conclusion, contribution, and future work", "Answer the question, state the contribution and limitations, and suggest grounded next steps."],
       ],
     };
 
+    const keywords = form.keywords.split(",").map((keyword) => keyword.trim()).filter(Boolean);
+    const objectives = form.objectives.split(/\r?\n/).map((objective) => objective.trim()).filter(Boolean);
+    const methodGuidance = {
+      Qualitative: "Use interviews, observations, documents, or other text-rich evidence; explain coding, interpretation, researcher reflexivity, and how credibility will be assessed.",
+      Quantitative: "Define measurable variables, a justified sample and design, data quality checks, and an analysis plan aligned with the question before examining outcomes.",
+      "Mixed methods": "Explain why both qualitative and quantitative evidence are needed, how each strand will be analyzed, and where the findings will be integrated.",
+      "Evidence synthesis": "Use a documented search and screening process, predefined eligibility criteria, transparent extraction, and a synthesis method suited to the included studies.",
+      "Case-based analysis": "Bound the case and timeframe, justify case selection, triangulate appropriate evidence sources, and distinguish observations from interpretation.",
+    };
     setOutline({
-      title: `${topic}: A ${form.discipline} ${form.format}`,
-      question: questions[form.format],
-      approach: approaches[form.format],
+      title: `${topic}: ${form.format} Plan`,
+      question: form.question.trim(),
+      approach: `${form.method} approach in ${form.discipline}. ${methodGuidance[form.method]} ${form.context.trim() ? `Study context: ${form.context.trim()}.` : "Define the study setting, population or data source before collecting evidence."}`,
+      keywords,
+      objectives,
+      searchQuery: keywords.length ? keywords.map((keyword) => `"${keyword}"`).join(" AND ") : `"${topic}"`,
+      inclusionCriteria: form.inclusionCriteria.trim(),
+      exclusionCriteria: form.exclusionCriteria.trim(),
       sections: sections[form.format],
     });
+  };
+
+  const downloadPlan = () => {
+    if (!outline) return;
+    const lines = [
+      outline.title,
+      "",
+      `Field: ${form.discipline}`,
+      `Research format: ${form.format}`,
+      `Methodology: ${form.method}`,
+      "",
+      `Research question: ${outline.question}`,
+      `Study context: ${form.context.trim() || "To be defined"}`,
+      `Keywords: ${outline.keywords.join(", ") || form.topic.trim()}`,
+      `Search query: ${outline.searchQuery}`,
+      `Inclusion criteria: ${outline.inclusionCriteria || "To be defined"}`,
+      `Exclusion criteria: ${outline.exclusionCriteria || "To be defined"}`,
+      "",
+      "Research objectives:",
+      ...(outline.objectives.length ? outline.objectives.map((objective, index) => `${index + 1}. ${objective}`) : ["To be defined"]),
+      "",
+      "Outline:",
+      ...outline.sections.flatMap(([title, guidance], index) => [`${index + 1}. ${title}`, `   ${guidance}`]),
+      "",
+      "Planning aid only. Verify sources, facts, ethics requirements, and institutional guidance independently.",
+    ];
+    const blobUrl = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "skillai-research-plan.txt";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
   };
 
   return (
@@ -1424,9 +1896,9 @@ function ResearchMakerPage() {
       <section className="standard-hero wrap">
         <div className="standard-hero-copy">
           <span className="eyebrow">Research Maker</span>
-          <h1>Shape a research idea into a clear outline.</h1>
-          <p>Enter a topic and get a practical starting structure for a research paper, literature review, or case study.</p>
-          <a href="#research-maker-form" className="primary-button">Build an outline <ArrowRight size={16} /></a>
+          <h1>Build a research plan you can actually follow.</h1>
+          <p>Clarify your question, define the method and scope, and leave with a structured plan and reproducible search query.</p>
+          <a href="#research-maker-form" className="primary-button">Start a research plan <ArrowRight size={16} /></a>
         </div>
         <div className="standard-hero-art">
           <img src="/career-research.svg" alt="Researcher organizing ideas and evidence" />
@@ -1436,9 +1908,9 @@ function ResearchMakerPage() {
       <section className="wrap standard-content">
         <div className="research-maker-panel" id="research-maker-form">
           <div className="section-heading">
-            <span className="eyebrow">Create a starter outline</span>
-            <h2>Start with your research question.</h2>
-            <p>This tool creates a template-based outline. It does not search for sources, verify facts, or write a finished paper.</p>
+            <span className="eyebrow">Research planning workspace</span>
+            <h2>Define the question before the paper.</h2>
+            <p>This creates a structured, editable planning template—not a finished paper. It does not search for sources or verify claims.</p>
           </div>
           <form className="research-maker-form" onSubmit={handleSubmit}>
             <label className="research-maker-field" htmlFor="research-topic">
@@ -1447,9 +1919,22 @@ function ResearchMakerPage() {
                 id="research-topic"
                 type="text"
                 value={form.topic}
+                maxLength={200}
                 onChange={(event) => setForm((current) => ({ ...current, topic: event.target.value }))}
                 placeholder="For example, AI tools in university learning"
                 required
+              />
+            </label>
+            <label className="research-maker-field research-maker-field-wide" htmlFor="research-question">
+              <span>Main research question</span>
+              <textarea
+                id="research-question"
+                value={form.question}
+                maxLength={500}
+                onChange={(event) => setForm((current) => ({ ...current, question: event.target.value }))}
+                placeholder="What do you want to find out? Keep it focused and answerable."
+                required
+                rows={3}
               />
             </label>
             <label className="research-maker-field" htmlFor="research-discipline">
@@ -1465,25 +1950,97 @@ function ResearchMakerPage() {
               </select>
             </label>
             <label className="research-maker-field" htmlFor="research-format">
-              <span>Research format</span>
+              <span>Project format</span>
               <select
                 id="research-format"
                 value={form.format}
                 onChange={(event) => setForm((current) => ({ ...current, format: event.target.value }))}
               >
-                {["Research paper", "Literature review", "Case study"].map((format) => (
+                {["Research paper", "Literature review", "Systematic review", "Research proposal", "Case study", "Thesis"].map((format) => (
                   <option key={format} value={format}>{format}</option>
                 ))}
               </select>
             </label>
-            <button type="submit" className="primary-button">Generate outline <ArrowRight size={16} /></button>
+            <label className="research-maker-field" htmlFor="research-method">
+              <span>Methodology</span>
+              <select
+                id="research-method"
+                value={form.method}
+                onChange={(event) => setForm((current) => ({ ...current, method: event.target.value }))}
+              >
+                {["Qualitative", "Quantitative", "Mixed methods", "Evidence synthesis", "Case-based analysis"].map((method) => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
+              </select>
+            </label>
+            <label className="research-maker-field" htmlFor="research-context">
+              <span>Population, dataset, or study context</span>
+              <input
+                id="research-context"
+                type="text"
+                value={form.context}
+                maxLength={200}
+                onChange={(event) => setForm((current) => ({ ...current, context: event.target.value }))}
+                placeholder="e.g. undergraduate students in public universities"
+              />
+            </label>
+            <label className="research-maker-field" htmlFor="research-keywords">
+              <span>Search keywords <small>comma-separated</small></span>
+              <input
+                id="research-keywords"
+                type="text"
+                value={form.keywords}
+                maxLength={300}
+                onChange={(event) => setForm((current) => ({ ...current, keywords: event.target.value }))}
+                placeholder="e.g. generative AI, higher education, learning outcomes"
+              />
+            </label>
+            <label className="research-maker-field research-maker-field-wide" htmlFor="research-objectives">
+              <span>Objectives <small>one per line</small></span>
+              <textarea
+                id="research-objectives"
+                value={form.objectives}
+                maxLength={1200}
+                onChange={(event) => setForm((current) => ({ ...current, objectives: event.target.value }))}
+                placeholder={"Compare existing approaches\nIdentify reported benefits and limitations"}
+                rows={3}
+              />
+            </label>
+            <label className="research-maker-field" htmlFor="research-inclusion">
+              <span>Include evidence that...</span>
+              <textarea
+                id="research-inclusion"
+                value={form.inclusionCriteria}
+                maxLength={500}
+                onChange={(event) => setForm((current) => ({ ...current, inclusionCriteria: event.target.value }))}
+                placeholder="e.g. studies involving university learners"
+                rows={3}
+              />
+            </label>
+            <label className="research-maker-field" htmlFor="research-exclusion">
+              <span>Exclude evidence that...</span>
+              <textarea
+                id="research-exclusion"
+                value={form.exclusionCriteria}
+                maxLength={500}
+                onChange={(event) => setForm((current) => ({ ...current, exclusionCriteria: event.target.value }))}
+                placeholder="e.g. opinion pieces without methods or evidence"
+                rows={3}
+              />
+            </label>
+            <button type="submit" className="primary-button">Build research plan <ArrowRight size={16} /></button>
           </form>
         </div>
 
         {outline && (
           <section className="research-maker-result" aria-live="polite" aria-labelledby="research-outline-title">
-            <span className="eyebrow">Starter outline · {form.format}</span>
-            <h2 id="research-outline-title">{outline.title}</h2>
+            <div className="research-maker-result-header">
+              <div>
+                <span className="eyebrow">Research plan · {form.format}</span>
+                <h2 id="research-outline-title">{outline.title}</h2>
+              </div>
+              <button type="button" className="secondary-button" onClick={downloadPlan}><Download size={16} /> Download plan</button>
+            </div>
             <div className="research-maker-guidance">
               <article>
                 <h3>Research question</h3>
@@ -1493,7 +2050,25 @@ function ResearchMakerPage() {
                 <h3>Suggested approach</h3>
                 <p>{outline.approach}</p>
               </article>
+              <article>
+                <h3>Search strategy starter</h3>
+                <p><strong>Keywords:</strong> {outline.keywords.join(", ") || form.topic}</p>
+                <code className="research-maker-search-query">{outline.searchQuery}</code>
+              </article>
+              <article>
+                <h3>Evidence boundaries</h3>
+                <p><strong>Include:</strong> {outline.inclusionCriteria || "Define which sources or participants are eligible."}</p>
+                <p><strong>Exclude:</strong> {outline.exclusionCriteria || "Define which sources or participants are out of scope."}</p>
+              </article>
             </div>
+            <section className="research-maker-objectives" aria-label="Research objectives">
+              <h3>Research objectives</h3>
+              {outline.objectives.length ? (
+                <ol>{outline.objectives.map((objective, index) => <li key={`${index}-${objective}`}>{objective}</li>)}</ol>
+              ) : (
+                <p>Add objectives in the form to define the practical steps for answering your question.</p>
+              )}
+            </section>
             <ol className="research-maker-sections">
               {outline.sections.map(([title, guidance]) => (
                 <li key={title}>
@@ -1502,7 +2077,7 @@ function ResearchMakerPage() {
                 </li>
               ))}
             </ol>
-            <p className="research-maker-disclaimer">Use this as a planning aid. Confirm requirements with your instructor, evaluate sources critically, and cite all evidence you use.</p>
+            <p className="research-maker-disclaimer">Planning template only—it does not find or verify sources, establish facts, or replace supervisor and ethics guidance. Evaluate evidence critically and cite all sources you use.</p>
           </section>
         )}
       </section>
