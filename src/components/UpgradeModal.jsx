@@ -27,16 +27,16 @@ export default function UpgradeModal({ feature, onClose }) {
         <div className="upgrade-modal-plans">
           <article>
             <strong>Plus</strong>
-            <span className="upgrade-modal-price">₹999 <small>/ 30 days</small></span>
-            <span>5 interviews + 5 assessments (20 questions each) + 10 AI paper requests per UTC month</span>
+            <span className="upgrade-modal-price">₹299 <small>/ month</small></span>
+            <span>5 interviews + 5 assessments (20 questions each), 10 AI paper requests per UTC month, and all Resume AI tools</span>
           </article>
           <article className="upgrade-modal-plan-featured">
             <strong>Pro</strong>
-            <span className="upgrade-modal-price">₹1,999 <small>/ 30 days</small></span>
-            <span>12 interviews + 12 assessments (20 questions each) + 30 AI paper requests per UTC month</span>
+            <span className="upgrade-modal-price">₹599 <small>/ month</small></span>
+            <span>12 interviews + 12 assessments (20 questions each), 30 AI paper requests per UTC month, and all Resume AI tools</span>
           </article>
         </div>
-        <p className="upgrade-modal-note">One-time purchase. Plans do not auto-renew.</p>
+        <p className="upgrade-modal-note">Paid plans unlock AI interview practice, AI paper requests, and Resume AI tools. Browse papers, save searches, and use Research Maker locally without paying. Choose 1, 3, 6, or 12 months on the pricing page. One-time purchase; no auto-renewal.</p>
         <Link to="/pricing" className="primary-button upgrade-modal-action">
           View plans <ArrowRight size={16} />
         </Link>

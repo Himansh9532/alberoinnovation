@@ -19,9 +19,13 @@ import {
   GraduationCap,
   Layers3,
   LoaderCircle,
+  Mail,
+  MapPin,
   Menu,
   Moon,
+  Phone,
   Search,
+  Send,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -44,6 +48,7 @@ import {
 import { getDashboardActivity } from "./data/dashboardActivity";
 import { apiUrl } from "./data/api";
 import { academicPaths } from "./data/academic-paths";
+import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../shared/plan-pricing.js";
 
 const InterviewExperiencePage = lazy(() => import("./components/InterviewExperience"));
 const SkillAssessmentPage = lazy(() => import("./components/SkillAssessment"));
@@ -90,6 +95,10 @@ const SEO_PAGES = {
   "/pricing": {
     title: "Plans and Pricing for SkillAI",
     description: "Compare SkillAI plans for AI interview practice and online skill assessments. Choose the option that fits your goals.",
+  },
+  "/contact": {
+    title: "Contact SkillAI",
+    description: "Get in touch with the SkillAI team for help, feedback, or partnership enquiries.",
   },
 };
 
@@ -149,14 +158,13 @@ const navItems = [
   },
   { label: "Resources", to: "/resources" },
   { label: "Pricing", to: "/pricing" },
+  { label: "Contact us", to: "/contact" },
 ];
 
 const workflowSteps = [
-  { number: "01", title: "Choose your direction", copy: "Tell us what you study, what you are good at, and where you would like to go next.", icon: UserRound },
-  { number: "02", title: "Understand your strengths", copy: "Turn your coursework, projects, experience, and interests into a clear skills picture.", icon: BarChart3 },
-  { number: "03", title: "Practice with purpose", copy: "Prepare for interviews, assessments, and real conversations in your chosen field.", icon: ShieldCheck },
-  { number: "04", title: "Explore what is possible", copy: "Discover career options, useful learning resources, and ideas from research.", icon: BookOpenText },
-  { number: "05", title: "Take your next step", copy: "Follow a practical roadmap that fits your goals, experience, and pace.", icon: TrendingUp },
+  { number: "01", title: "Choose a starting point", copy: "Explore a field or open the tool that fits what you want to work on today.", icon: Target },
+  { number: "02", title: "Learn by doing", copy: "Practice a skill, prepare for an interview, or work with your resume.", icon: Sparkles },
+  { number: "03", title: "Plan what comes next", copy: "Use research, resources, and career paths to guide your next step.", icon: TrendingUp },
 ];
 
 const ASSESSMENT_FAQS = [
@@ -189,40 +197,11 @@ const domainCards = [
   { icon: BookOpenText, name: "Education & Humanities", description: "Connect your strengths in teaching, languages, history, policy, and social sciences to work.", skills: "Transferable skills", interview: "Communication practice", research: "Career pathways" },
 ];
 
-const resumeCapabilities = [
-  { label: "01 · Upload", value: "Extract document text" },
-  { label: "02 · Review", value: "Check the source against extraction" },
-  { label: "03 · Compare", value: "Find shared role and job terms" },
-  { label: "04 · Build", value: "Edit and export your resume" },
-];
-
-const interviewModes = ["Role-specific", "Behavioral", "Portfolio Review", "Case Discussion", "Presentation", "Situational", "Project Viva", "Mixed Practice"];
-
-const competencyBreakdown = [
-  { label: "Field Knowledge", value: 82 },
-  { label: "Problem Solving", value: 76 },
-  { label: "Communication", value: 88 },
-  { label: "Practical Experience", value: 91 },
-  { label: "Confidence", value: 72 },
-];
-
-const researchCards = [
-  { title: "Designing more accessible services for diverse communities", authors: "Interdisciplinary perspectives · Public services", year: 2026, venue: "Accessibility & Society", citations: 42, open: "Open Access" },
-  { title: "Sustainable materials and resilient cities", authors: "Built environment · Climate research", year: 2025, venue: "Sustainability Review", citations: 28, open: "AI Summary Available" },
-  { title: "Improving communication in community healthcare", authors: "Health practice · Human-centered research", year: 2024, venue: "Health & Society", citations: 67, open: "Journal" },
-];
-
 const resourceCards = [
   { category: "Career Skills", level: "All levels", title: "Explain your experience with clarity and confidence" },
   { category: "Portfolio", level: "Practical guide", title: "Showcase projects, placements, and hands-on work" },
   { category: "Communication", level: "All levels", title: "Prepare for interviews across different industries" },
   { category: "Research", level: "Step-by-step", title: "Find reliable sources and build a strong research question" },
-];
-
-const weakPoints = [
-  { skill: "Communicating your experience", current: "Developing", target: "Confident", evidence: "Some examples could better explain your contribution and outcome.", suggest: "Practice telling concise stories about your work and learning." },
-  { skill: "Connecting skills to goals", current: "Developing", target: "Confident", evidence: "Your profile has strengths that are not yet clearly linked to target roles.", suggest: "Compare role requirements with your coursework and experience." },
-  { skill: "Planning your next steps", current: "Developing", target: "Confident", evidence: "A few growth areas could use clearer priorities.", suggest: "Choose one practical skill or project to focus on next." },
 ];
 
 function Navbar({ user, onLogout }) {
@@ -404,42 +383,66 @@ function SectionHeading({ eyebrow, title, description }) {
 }
 
 function HomePage() {
+  const homeTools = [
+    { icon: BarChart3, title: "Skill assessments", copy: "Practice a subject or career skill and review guidance on what to learn next.", to: "/assessment", link: "Explore assessments" },
+    { icon: BriefcaseBusiness, title: "AI interview practice", copy: "Prepare for role-specific and behavioral conversations at your own pace.", to: "/interview", link: "See interview practice" },
+    { icon: FileText, title: "Resume workspace", copy: "Review resume text, compare job terms, and work on career materials.", to: "/resume/dashboard", link: "Open resume tools" },
+    { icon: BookOpenText, title: "Research hub", copy: "Search scholarly work by field, subject, year, and publication type.", to: "/research", link: "Find research" },
+    { icon: TrendingUp, title: "Career roadmaps", copy: "Connect your current skills with roles and practical steps to explore.", to: "/roadmap", link: "Explore roadmaps" },
+  ];
+
   return (
     <main className="page-shell home-page">
-      <section className="hero-section wrap">
+      <section className="hero-section wrap" aria-labelledby="home-title">
         <div className="hero-copy">
-          <span className="eyebrow"><span className="eyebrow-dot" /> ONLINE SKILL ASSESSMENTS</span>
-          <h1>Understand your skills<span>and what to learn next.</span></h1>
-          <p>Take a structured skill assessment, explore your strengths, practice AI-powered interviews, and get practical guidance for your next career step.</p>
+          <span className="eyebrow"><span className="eyebrow-dot" /> SKILLS · CAREER · LEARNING</span>
+          <h1 id="home-title">Make your next move<span>with more clarity.</span></h1>
+          <p>Explore your strengths, practice for opportunities, and find useful next steps—all in one place built for learning and career growth.</p>
           <div className="cta-row">
-            <Link to="/register" className="primary-button">Start for Free <ArrowRight size={17} /></Link>
-            <Link to="/domains" className="secondary-button">Explore Career Paths <ArrowUpRight size={17} /></Link>
+            <Link to="/register" className="primary-button">Get started free <ArrowRight size={17} /></Link>
+            <a href="#home-tools" className="secondary-button">Explore the tools <ArrowUpRight size={17} /></a>
           </div>
           <div className="hero-proof">
-            <span className="proof-line" aria-hidden="true" />
-            <span>One place to prepare, grow, and explore what comes next.</span>
+            <ShieldCheck size={16} aria-hidden="true" />
+            <span>Your goals set the pace. Start wherever you are.</span>
           </div>
         </div>
 
         <div className="home-visual">
           <img
             src="/all-fields-career.svg"
-            alt="Original illustration of a professional with a career growth dashboard"
+            alt="Illustration of a professional exploring career growth"
           />
           <div className="home-visual-caption">
             <span className="home-caption-mark"><Sparkles size={17} /></span>
-            <span><strong>Your goals, your path</strong><small>Career support for every discipline.</small></span>
+            <span><strong>One step at a time</strong><small>Build a path around your goals.</small></span>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-soft home-tools-section" id="home-tools">
+        <div className="wrap">
+          <SectionHeading eyebrow="Explore SkillAI" title="A useful place to start, whatever your goal." description="Choose one tool to work on a skill, prepare for an opportunity, or explore a direction." />
+          <div className="home-tools-grid">
+            {homeTools.map(({ icon: Icon, title, copy, to, link }) => (
+              <Link key={title} to={to} className="home-tool-card">
+                <span className="home-tool-icon"><Icon size={20} /></span>
+                <span className="home-tool-card-arrow"><ArrowUpRight size={17} /></span>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+                <span className="home-tool-link">{link} <ArrowRight size={15} /></span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
       <section className="section wrap home-process-section">
-        <SectionHeading eyebrow="How SkillAI works" title="A clearer path, one step at a time." description="Start with your goals, understand your strengths, and get practical guidance for the next move in your education or career." />
-        <div className="workflow-grid">
+        <SectionHeading eyebrow="A simple way forward" title="Start small. Keep building." description="You do not need a complete plan before you begin. Pick a useful next step, learn from it, and adjust as you go." />
+        <div className="home-next-grid">
           {workflowSteps.map(({ number, title, copy, icon: Icon }) => (
-            <article key={number} className="workflow-card">
-              <span className="step-number">{number}</span>
-              <div className="step-icon"><Icon size={18} /></div>
+            <article key={number}>
+              <div className="home-step-heading"><span>{number}</span><Icon size={17} /></div>
               <h3>{title}</h3>
               <p>{copy}</p>
             </article>
@@ -449,260 +452,35 @@ function HomePage() {
 
       <section className="section section-soft home-fields-section">
         <div className="wrap">
-          <SectionHeading eyebrow="Find your field" title="A starting point for every kind of ambition." description="Explore opportunities across industries and disciplines. Your path is personal—and it does not have to look like anyone else’s." />
+          <div className="home-fields-heading">
+            <SectionHeading eyebrow="Explore by field" title="Your interests can lead in more than one direction." description="Browse academic and professional areas, then choose the tools and topics that make sense for you." />
+            <Link to="/domains" className="text-link">Browse all fields <ArrowRight size={16} /></Link>
+          </div>
           <div className="domain-grid">
-            {domainCards.map(({ icon: Icon, name, description, skills, interview, research }) => (
-              <article key={name} className="domain-card">
-                <div className="domain-head">
-                  <span className="domain-icon"><Icon size={18} /></span>
-                  <button type="button" className="ghost-action">Explore</button>
-                </div>
+            {domainCards.map(({ icon: Icon, name, description }) => (
+              <Link key={name} to="/domains" className="domain-card home-domain-card">
+                <span className="domain-icon"><Icon size={18} /></span>
                 <h3>{name}</h3>
                 <p>{description}</p>
-                <div className="domain-meta">
-                  <span>{skills}</span>
-                  <span>{interview}</span>
-                  <span>{research}</span>
-                </div>
-              </article>
+                <span className="home-domain-link">Explore field <ArrowRight size={14} /></span>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section wrap home-path-section">
-        <div className="home-path-visual">
-          <img src="/all-fields-pathways.svg" alt="A professional surrounded by different career pathway cards" />
-        </div>
-        <div className="home-path-copy">
-          <span className="eyebrow">A plan that fits you</span>
-          <h2>Your degree is one part of your story. Your strengths shape the rest.</h2>
-          <p>Connect what you have learned with what you want to do next. SkillAI helps you see the skills you already bring, discover roles you may not have considered, and plan practical next steps.</p>
-          <ul className="home-path-points">
-            <li>See how your current skills transfer to new roles.</li>
-            <li>Practice interviews that match your goals and experience.</li>
-            <li>Get learning recommendations you can act on.</li>
-          </ul>
-          <Link to="/roadmap" className="text-link">Explore career roadmaps <ArrowRight size={16} /></Link>
-        </div>
-      </section>
-
-      <section className="section section-soft home-tools-section">
-        <div className="wrap">
-          <SectionHeading eyebrow="Your toolkit" title="Everything you need for the next step." description="Start wherever you are. Choose a tool that supports the goal you are working toward." />
-          <div className="home-tools-grid">
-            {[
-              { icon: UserRound, title: "Career direction", copy: "Explore roles that connect with your interests and strengths.", to: "/roadmap", link: "Build a roadmap" },
-              { icon: ShieldCheck, title: "Interview practice", copy: "Prepare to explain your experience clearly and confidently.", to: "/interview", link: "Practice interviews" },
-              { icon: BarChart3, title: "Skill assessment", copy: "Understand what you know and choose what to build next.", to: "/assessment", link: "Explore assessments" },
-              { icon: BookOpenText, title: "Learning resources", copy: "Find focused guides, research, and ways to keep growing.", to: "/resources", link: "Browse resources" },
-            ].map(({ icon: Icon, title, copy, to, link }) => (
-              <article key={title} className="home-tool-card">
-                <span className="home-tool-icon"><Icon size={20} /></span>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-                <Link to={to} className="text-link">{link} <ArrowRight size={15} /></Link>
-              </article>
-            ))}
+      <section className="section wrap home-cta-section">
+        <div className="home-cta-panel">
+          <div>
+            <span className="eyebrow">YOUR NEXT STEP</span>
+            <h2>You do not have to figure it all out today.</h2>
+            <p>Start with one tool, explore what you learn, and build from there.</p>
+          </div>
+          <div className="home-cta-actions">
+            <Link to="/register" className="primary-button">Get started free <ArrowRight size={17} /></Link>
+            <Link to="/domains" className="home-cta-link">Explore career fields <ArrowUpRight size={16} /></Link>
           </div>
         </div>
-      </section>
-
-      <section className="section wrap home-interview-section">
-        <div className="home-interview-copy">
-          <span className="eyebrow">Prepare for real opportunities</span>
-          <h2>Show what you can do—not just what you studied.</h2>
-          <p>Practice the conversations that matter in your field, from explaining a design portfolio or lab project to discussing a business case, clinical scenario, or engineering challenge.</p>
-          <div className="home-example-tags">
-            {["Portfolio review", "Case discussion", "Project presentation", "Role-specific questions"].map((tag) => (
-              <span key={tag}>{tag}</span>
-            ))}
-          </div>
-          <Link to="/interview" className="text-link">Explore interview practice <ArrowRight size={16} /></Link>
-        </div>
-        <div className="home-interview-visual">
-          <img src="/career-interview.svg" alt="Professional preparing for a career interview" />
-          <div className="home-image-note">
-            <span className="status-pill"><span className="dot" /> Practice at your pace</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="section wrap home-steps-section">
-        <SectionHeading eyebrow="Your next chapter" title="Small steps can open up new possibilities." description="You do not need to have everything figured out. Start with what you know, then keep moving forward." />
-        <div className="home-next-grid">
-          <article><span>01</span><h3>Start with your strengths</h3><p>Bring your studies, work, projects, and interests together in one place.</p></article>
-          <article><span>02</span><h3>Explore what fits</h3><p>Compare career directions and understand the skills each path needs.</p></article>
-          <article><span>03</span><h3>Build at your pace</h3><p>Practice, learn, and create evidence of your progress over time.</p></article>
-        </div>
-      </section>
-
-      <section className="section wrap home-legacy-section">
-        <div className="resume-layout">
-          <div className="resume-preview">
-            <div className="resume-header">
-              <div><span className="eyebrow">RESUME WORKSPACE</span><h3>Your content. Your review.</h3></div>
-              <span className="score-tag">Local</span>
-            </div>
-            <div className="resume-body">
-              <div className="resume-block big"><span>01 · Start</span><strong>Upload your own resume</strong></div>
-              <div className="resume-block"><span>02 · Inspect</span><strong>Review extracted text</strong></div>
-              <div className="resume-block"><span>03 · Compare</span><strong>Check terms against a role</strong></div>
-              <div className="resume-block"><span>04 · Improve</span><strong>Edit only verified details</strong></div>
-            </div>
-          </div>
-
-          <div className="resume-analysis">
-            <SectionHeading eyebrow="Resume workspace" title="Practical tools, with your information in control." description="Review locally extracted resume text, compare exact terms with roles or job descriptions, and create an editable draft. The tools do not invent personal scores or claim a recruiter evaluation." />
-            <div className="metric-grid">
-              {resumeCapabilities.map(({ label, value }) => (
-                <div key={label} className="metric-card">
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="analysis-grid">
-              <div>
-                <h4>What the tools can check</h4>
-                <ul>
-                  <li>Text and common section headings</li>
-                  <li>Terms from the built-in role catalog</li>
-                  <li>Bullet and outcome-number patterns</li>
-                </ul>
-              </div>
-              <div>
-                <h4>What they cannot decide</h4>
-                <ul>
-                  <li>Whether you are qualified or right for a job</li>
-                  <li>Whether a claim is true or independently verified</li>
-                  <li>How an employer or ATS will rank your resume</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-soft home-legacy-section">
-        <div className="wrap interview-layout">
-          <div className="interview-panel">
-            <SectionHeading eyebrow="AI interview experience" title="Dynamic, adaptive, and tailored to the role." description="SkillAI does not behave like a static question bank. It evolves with each answer, checks for evidence, and deepens the discussion based on your real performance." />
-            <div className="mode-pills">
-              {interviewModes.map((mode) => (<span key={mode} className="mode-pill">{mode}</span>))}
-            </div>
-            <div className="conversation-card">
-              <div className="conversation-row"><span className="bubble ai">AI</span><p>“Tell me about the architecture of your project and the trade-offs you considered.”</p></div>
-              <div className="conversation-row user"><span className="bubble user-badge">You</span><p>“I focused on modular design, asynchronous processing, and separate data and inference layers.”</p></div>
-              <div className="conversation-row"><span className="bubble ai">AI</span><p>“Good. Can you explain the bottleneck and how you would scale this under heavier traffic?”</p></div>
-            </div>
-          </div>
-
-          <aside className="panel-side">
-            <div className="panel-header"><strong>Practice feedback</strong><span>Sample</span></div>
-            {competencyBreakdown.map(({ label, value }) => (
-              <div key={label} className="competency-row">
-                <div className="competency-label-row"><span>{label}</span><strong>{value}%</strong></div>
-                <div className="progress-track"><span style={{ width: `${value}%` }} /></div>
-              </div>
-            ))}
-            <div className="timer-box"><TimerReset size={16} /><span>Interview timer</span><strong>23:14</strong></div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="section wrap home-legacy-section">
-        <div className="readiness-grid">
-          <div className="report-card">
-            <SectionHeading eyebrow="Career readiness" title="SkillAI Career Readiness Score" description="A transparent estimate based on interview evidence, resume quality, skills, and active research signals." />
-            <div className="big-score"><strong>78</strong><span>/ 100</span></div>
-            <div className="score-breakdown">
-              <div><span>Field Knowledge</span><strong>84</strong></div>
-              <div><span>Interview Performance</span><strong>76</strong></div>
-              <div><span>Communication</span><strong>72</strong></div>
-              <div><span>Projects</span><strong>81</strong></div>
-              <div><span>Resume</span><strong>88</strong></div>
-              <div><span>Research</span><strong>67</strong></div>
-              <div><span>Problem Solving</span><strong>79</strong></div>
-            </div>
-          </div>
-
-          <div className="weakness-card">
-            <div className="panel-header"><strong>Weakness engine</strong><span>Evidence-based targets</span></div>
-            <div className="weakness-list">
-              {weakPoints.map(({ skill, current, target, evidence, suggest }) => (
-                <div key={skill} className="weakness-item">
-                  <h4>{skill}</h4>
-                  <div className="weakness-meta"><span>Current: {current}</span><span>Target: {target}</span></div>
-                  <p>{evidence}</p>
-                  <small>{suggest}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-soft home-legacy-section">
-        <div className="wrap">
-          <SectionHeading eyebrow="Research hub" title="Discover research. Understand evidence. Build new ideas." description="Explore legitimate scholarly sources, compare findings, and keep your investigation grounded in transparent references." />
-          <div className="research-hero">
-            <div className="research-search"><Search size={18} /><input type="text" value="What do you want to research?" readOnly aria-label="Research prompt" /></div>
-            <div className="search-suggestions"><span>Generative AI in education</span><span>AI-based fraud detection</span><span>LLMs for research workflows</span></div>
-          </div>
-          <div className="paper-grid">
-            {researchCards.map((paper) => (
-              <article key={paper.title} className="paper-card">
-                <div className="paper-head"><span>{paper.year}</span><span>{paper.open}</span></div>
-                <h3>{paper.title}</h3>
-                <p>{paper.authors}</p>
-                <div className="paper-meta"><span>{paper.venue}</span><span>Citations: {paper.citations}</span></div>
-                <div className="paper-actions"><button type="button" className="ghost-action">Read Paper</button><button type="button" className="ghost-action">Ask AI</button></div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section wrap home-legacy-section">
-        <div className="roadmap-outer">
-          <SectionHeading eyebrow="Career roadmap" title="Turn ambition into a practical, evidence-backed path." description="SkillAI helps you map your present skills to clear next milestones and target roles." />
-          <div className="roadmap-grid">
-            {[
-              { label: 'Current', title: 'Where you are today', skills: ['Your core knowledge', 'Coursework or training', 'Hands-on experience'], gap: ['Skills to strengthen', 'New areas to explore'], projects: ['A project that shows what you can do'] },
-              { label: 'Next', title: 'A direction to explore', skills: ['Transferable strengths', 'Role-specific knowledge', 'Communication'], gap: ['Experience to build', 'Tools or methods to learn'], projects: ['A practical portfolio or field project'] },
-              { label: 'Target', title: 'The goal you choose', skills: ['Capabilities for your goal', 'Professional practice', 'Continuous learning'], gap: ['Your next milestones', 'Support and experience'], projects: ['Work that demonstrates your growth'] },
-            ].map((step) => (
-              <article key={step.label} className="roadmap-card">
-                <span className="roadmap-label">{step.label}</span>
-                <h3>{step.title}</h3>
-                <div><h4>Required skills</h4><ul>{step.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
-                <div><h4>Skill gap</h4><ul>{step.gap.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
-                <div><h4>Recommended projects</h4><ul>{step.projects.map((project) => <li key={project}>{project}</li>)}</ul></div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-soft home-legacy-section">
-        <div className="wrap">
-          <SectionHeading eyebrow="Resources" title="Professional resources, designed for deliberate learning." description="From interview prep to research methodology, build targeted learning loops for the next milestone." />
-          <div className="resource-grid">
-            {resourceCards.map(({ category, level, title }) => (
-              <article key={title} className="resource-card">
-                <div className="resource-topline"><span>{category}</span><span>{level}</span></div>
-                <h3>{title}</h3>
-                <Link to="/resources" className="text-link">View resource <ArrowRight size={15} /></Link>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="wrap cta-panel home-cta-panel">
-        <div><span className="eyebrow eyebrow-light">Your next step starts here</span><h2>Whatever your field, you can build a future that feels like yours.</h2></div>
-        <Link to="/register" className="primary-button light">Start for Free <ArrowUpRight size={18} /></Link>
       </section>
     </main>
   );
@@ -2123,49 +1901,252 @@ function ResourcesPage() {
   );
 }
 
+function ContactPage() {
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const name = String(values.get("name") || "").trim();
+    const email = String(values.get("email") || "").trim();
+    const topic = String(values.get("topic") || "General enquiry");
+    const message = String(values.get("message") || "").trim();
+    const subject = encodeURIComponent(`SkillAI contact: ${topic}`);
+    const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nTopic: ${topic}\n\n${message}`);
+    window.location.href = `mailto:Business@alberotechnologies.com?subject=${subject}&body=${body}`;
+  };
+
+  return (
+    <main className="page-shell contact-page">
+      <section className="contact-hero wrap">
+        <div className="contact-intro">
+          <span className="eyebrow">Contact us</span>
+          <h1>We'd love to hear from you.</h1>
+          <p>Have a question, feedback, or an idea to share? Reach out to our team and we'll be glad to help.</p>
+          <div className="contact-details" aria-label="Contact details">
+            <a className="contact-detail-card" href="mailto:Business@alberotechnologies.com">
+              <span className="contact-detail-icon"><Mail size={19} /></span>
+              <span><small>Email us</small><strong>Business@alberotechnologies.com</strong></span>
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </a>
+            <a className="contact-detail-card" href="tel:+919170780671">
+              <span className="contact-detail-icon"><Phone size={19} /></span>
+              <span><small>Call us</small><strong>+91 91707 80761</strong></span>
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </a>
+            <div className="contact-detail-card">
+              <span className="contact-detail-icon"><MapPin size={19} /></span>
+              <span><small>Our location</small><strong>Noida, Uttar Pradesh, India</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="contact-form-side">
+          <section className="contact-form-card" aria-labelledby="contact-form-title">
+            <div className="contact-form-heading">
+              <span className="contact-form-mark"><Send size={18} /></span>
+              <div><h2 id="contact-form-title">Send us a message</h2><p>Fill in the details and your email app will open with your message ready.</p></div>
+            </div>
+            <form className="contact-form" onSubmit={handleSubmit}>
+              <div className="contact-form-row">
+                <label className="field"><span>Your name</span><input className="auth-input" name="name" autoComplete="name" placeholder="e.g. Alex Kumar" required /></label>
+                <label className="field"><span>Email address</span><input className="auth-input" type="email" name="email" autoComplete="email" placeholder="you@example.com" required /></label>
+              </div>
+              <label className="field"><span>What can we help with?</span>
+                <select className="auth-input" name="topic" defaultValue="General enquiry">
+                  <option>General enquiry</option>
+                  <option>Technical support</option>
+                  <option>Feedback or suggestion</option>
+                  <option>Partnership enquiry</option>
+                  <option>Billing question</option>
+                </select>
+              </label>
+              <label className="field"><span>Your message</span><textarea className="auth-input contact-message-input" name="message" rows="5" placeholder="Tell us how we can help..." required /></label>
+              <button type="submit" className="primary-button contact-submit">Open email app <ArrowRight size={17} /></button>
+              <p className="contact-form-note">Your message isn't sent automatically. Review it in your email app and press Send.</p>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function loadRazorpayCheckoutScript() {
+  if (window.Razorpay) return Promise.resolve();
+  const scriptId = "razorpay-checkout-script";
+  const existingScript = document.getElementById(scriptId);
+  if (existingScript) {
+    return new Promise((resolve, reject) => {
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Razorpay checkout could not be loaded. Check your connection and try again.")), { once: true });
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Razorpay checkout could not be loaded. Check your connection and try again."));
+    document.body.appendChild(script);
+  });
+}
+
 function PricingPage({ user, onLogout }) {
   const [checkoutPlan, setCheckoutPlan] = useState("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [usage, setUsage] = useState(null);
   const [usageError, setUsageError] = useState("");
+  const [refreshUsage, setRefreshUsage] = useState(0);
+  const [billingMonths, setBillingMonths] = useState(1);
+
+  useEffect(() => {
+    if (user?.authProvider !== "firebase") {
+      setUsage(null);
+      setUsageError("");
+      return undefined;
+    }
+    let cancelled = false;
+    const loadUsage = async () => {
+      setUsageError("");
+      try {
+        const token = await getFirebaseIdToken();
+        const response = await fetch(apiUrl("/api/billing/usage"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Your plan details could not be loaded.");
+        if (!cancelled) setUsage(result);
+      } catch (error) {
+        if (!cancelled) setUsageError(error.message || "Your plan details could not be loaded.");
+      }
+    };
+    void loadUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, refreshUsage]);
+
+  const startCheckout = async (plan, months) => {
+    if (!user) {
+      setCheckoutMessage("Sign in with your SkillAI account before choosing a paid plan.");
+      return;
+    }
+    if (user.authProvider !== "firebase") {
+      setCheckoutMessage("Plan purchases require a Firebase-backed SkillAI account. Sign out and sign in with Firebase to continue.");
+      return;
+    }
+    if (!["plus", "pro"].includes(plan) || ![1, 3, 6, 12].includes(months)) {
+      setCheckoutMessage("Choose a valid paid plan.");
+      return;
+    }
+
+    setCheckoutPlan(`${plan}-${months}`);
+    setCheckoutMessage("");
+    try {
+      const token = await getFirebaseIdToken();
+      const orderResponse = await fetch(apiUrl("/api/billing/order"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan, months }),
+      });
+      const order = await orderResponse.json();
+      if (!orderResponse.ok) throw new Error(order.error || "Checkout could not be started.");
+
+      await loadRazorpayCheckoutScript();
+      if (!window.Razorpay) throw new Error("Razorpay checkout is unavailable. Please refresh and try again.");
+
+      const checkout = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "SkillAI",
+        description: `${plan === "plus" ? "Plus" : "Pro"} plan · ${months} ${months === 1 ? "month" : "months"}`,
+        order_id: order.orderId,
+        handler: async (payment) => {
+          setCheckoutMessage("Payment received. Verifying it securely…");
+          try {
+            const verificationResponse = await fetch(apiUrl("/api/billing/verify-payment"), {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payment),
+            });
+            const verification = await verificationResponse.json();
+            if (!verificationResponse.ok) throw new Error(verification.error || "Payment verification failed.");
+            const receiptStatus = verification.receiptEmailSent
+              ? "Your receipt was emailed to you and the business."
+              : verification.receiptEmailPending
+                ? "Your receipt email is being processed; please check your inbox shortly."
+                : verification.receiptEmailError || "Your receipt could not be emailed yet. Please contact support.";
+            setCheckoutMessage(`${plan === "plus" ? "Plus" : "Pro"} is active for ${months} ${months === 1 ? "month" : "months"}. Thank you for your purchase. ${receiptStatus}`);
+            setRefreshUsage((current) => current + 1);
+          } catch (error) {
+            setCheckoutMessage(`${error.message || "Payment verification failed."} If money was debited, contact support with your payment ID: ${payment.razorpay_payment_id || "unavailable"}.`);
+          } finally {
+            setCheckoutPlan("");
+          }
+        },
+        modal: {
+          ondismiss: () => setCheckoutPlan(""),
+        },
+        theme: { color: "#356be0" },
+      });
+      checkout.on("payment.failed", (event) => {
+        setCheckoutMessage(event.error?.description || "Payment did not complete. You can try again.");
+        setCheckoutPlan("");
+      });
+      checkout.open();
+    } catch (error) {
+      setCheckoutMessage(error.message || "Checkout could not be started. Please try again.");
+      setCheckoutPlan("");
+    }
+  };
+
   const plans = [
     {
       name: "Free",
       price: "₹0",
-      description: "Get started with the core SkillAI experience.",
+      description: "Get started with the core SkillAI experience, including non-AI research tools.",
       features: [
         "Create a SkillAI account",
         "One lifetime AI interview or assessment start",
-        "Browse research papers; AI paper help is included in paid plans",
-        "Explore career resources",
+        "Browse research papers, save searches, and use your personal library",
+        "Use the local Research Maker planning template at no cost",
+        "Explore career resources and non-AI learning tools",
       ],
       action: "Get started free",
       featured: false,
     },
     {
       name: "Plus",
-      price: "₹999",
+      price: PLAN_PRICES_INR.plus[billingMonths],
       description: "For learners building consistent practice habits.",
       features: [
         "Everything in Free",
         "5 AI interviews + 5 assessments per UTC calendar month",
         "20 questions per assessment",
         "10 AI paper requests per UTC calendar month",
+        "All Resume AI tools: analyzer, job match, tailor, and skill gaps",
         "Personalized feedback and progress review",
-        "Research Maker planning tools",
       ],
       action: "Choose Plus",
       featured: true,
     },
     {
       name: "Pro",
-      price: "₹1,999",
+      price: PLAN_PRICES_INR.pro[billingMonths],
       description: "For focused preparation across your career journey.",
       features: [
         "Everything in Plus",
         "12 AI interviews + 12 assessments per UTC calendar month",
         "20 questions per assessment",
         "30 AI paper requests per UTC calendar month",
+        "All Resume AI tools: analyzer, job match, tailor, and skill gaps",
         "Advanced interview preparation",
         "Deeper skill and career insights",
         "Priority access to new features",
@@ -2180,26 +2161,37 @@ function PricingPage({ user, onLogout }) {
       <section className="pricing-hero wrap">
         <span className="eyebrow">Simple, transparent pricing</span>
         <h1>Choose the support that fits your next step.</h1>
-        <p>Plans are priced in Indian rupees. Paid plans are one-time purchases valid for 30 days; they do not auto-renew.</p>
+        <p>Every paid plan brings interview practice, the Resume AI toolkit, and research support together. Pro adds higher monthly limits. Choose a term; paid plans are one-time purchases and never auto-renew.</p>
       </section>
-      <section className="wrap pricing-plan-grid" aria-label="Monthly SkillAI plans">
+      <section className="wrap pricing-term-picker" aria-label="Choose plan duration">
+        <span>Choose your plan duration</span>
+        <div role="group" aria-label="Plan duration">
+          {PLAN_BILLING_TERMS.map((term) => (
+            <button key={term.months} type="button" className={billingMonths === term.months ? "active" : ""} aria-pressed={billingMonths === term.months} onClick={() => setBillingMonths(term.months)}>
+              {term.label}{term.savings && <small>{term.savings}</small>}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="wrap pricing-plan-grid" aria-label={`${PLAN_BILLING_TERMS.find((term) => term.months === billingMonths)?.label} SkillAI plans`}>
         {plans.map((plan) => (
           <article key={plan.name} className={`pricing-plan-card${plan.featured ? " featured" : ""}`}>
             {plan.featured && <span className="pricing-popular">Most popular</span>}
             <h2>{plan.name}</h2>
             <p className="pricing-plan-description">{plan.description}</p>
             <p className="pricing-plan-price">
-              <strong>{plan.price}</strong>
-              {plan.price !== "₹0" && <span>/ 30 days</span>}
-              {plan.price === "₹0" && <span>forever</span>}
+              <strong>{plan.name === "Free" ? plan.price : `₹${plan.price.toLocaleString("en-IN")}`}</strong>
+              {plan.name !== "Free" && <span>for {PLAN_BILLING_TERMS.find((term) => term.months === billingMonths)?.label}</span>}
+              {plan.name === "Free" && <span>forever</span>}
             </p>
+            {plan.name !== "Free" && <p className="pricing-monthly-equivalent">₹{Math.round(plan.price / billingMonths).toLocaleString("en-IN")} per month · one-time payment</p>}
             {plan.name === "Free" ? (
               <Link to={user ? "/dashboard" : "/register"} className="secondary-button pricing-plan-action">
                 {plan.action} <ArrowRight size={16} />
               </Link>
             ) : (
-              <button type="button" className={plan.featured ? "primary-button pricing-plan-action" : "secondary-button pricing-plan-action"} onClick={() => startCheckout(plan.name.toLowerCase())} disabled={Boolean(checkoutPlan)}>
-                {checkoutPlan === plan.name.toLowerCase() ? "Opening checkout..." : plan.action} <ArrowRight size={16} />
+              <button type="button" className={plan.featured ? "primary-button pricing-plan-action" : "secondary-button pricing-plan-action"} onClick={() => startCheckout(plan.name.toLowerCase(), billingMonths)} disabled={Boolean(checkoutPlan)}>
+                {checkoutPlan === `${plan.name.toLowerCase()}-${billingMonths}` ? "Opening checkout..." : plan.action} <ArrowRight size={16} />
               </button>
             )}
             <ul className="pricing-feature-list">
@@ -2212,7 +2204,7 @@ function PricingPage({ user, onLogout }) {
       </section>
       {checkoutMessage && <div className="wrap pricing-checkout-message" role="status">
         {checkoutMessage}
-        {!user && <Link to="/login">Sign in</Link>}
+        {!user && <Link to="/login" state={{ from: "/pricing" }}>Sign in</Link>}
         {user && user.authProvider !== "firebase" && <button type="button" className="text-link" onClick={onLogout}>Sign out, then sign in with Firebase</button>}
       </div>}
       {user?.authProvider === "firebase" && (
@@ -2230,7 +2222,7 @@ function PricingPage({ user, onLogout }) {
           ) : <span>{usageError || "Loading your current plan..."}</span>}
         </section>
       )}
-      <p className="wrap pricing-disclaimer">Paid plans are one-time purchases valid for 30 days; they do not auto-renew. Monthly feature limits reset on the first day of each UTC month. Free includes one lifetime practice start shared between interviews and assessments.</p>
+      <p className="wrap pricing-disclaimer">Paid plans are one-time purchases; they do not auto-renew. Plan benefits stay active for the selected term. Usage limits shown above reset monthly on the first day of each UTC month, including multi-month plans. Free includes one lifetime practice start shared between interviews and assessments.</p>
     </main>
   );
 }
@@ -2605,7 +2597,7 @@ function Footer() {
         <span>© 2026 SkillAI</span>
         <span>Privacy</span>
         <span>Terms</span>
-        <span>Contact</span>
+        <Link to="/contact">Contact us</Link>
       </div>
     </footer>
   );
@@ -2726,6 +2718,7 @@ function App() {
       state={{ from: `${location.pathname}${location.search}${location.hash}` }}
     />
   );
+  const requireSession = (element) => session ? element : loginRequired;
 
   return (
     <>
@@ -2733,21 +2726,22 @@ function App() {
       <main className="page-main">
         <Routes>
           <Route path="/" element={session ? <DashboardPage user={session} /> : <HomePage />} />
-          <Route path="/domains" element={<DomainsPage />} />
-          <Route path="/interview" element={<InterviewPage />} />
-          <Route path="/interview/start" element={<Suspense fallback={<main className="page-shell interview-experience"><div className="wrap">Loading interview setup...</div></main>}><InterviewExperiencePage /></Suspense>} />
-          <Route path="/resume" element={session ? resumePage : loginRequired} />
-          <Route path="/resume/:section" element={session ? resumePage : loginRequired} />
-          <Route path="/assessment" element={<AssessmentPage />} />
-          <Route path="/assessment/start" element={<Suspense fallback={<main className="page-shell skill-assessment-page"><div className="wrap">Loading your assessment...</div></main>}><SkillAssessmentPage /></Suspense>} />
-          <Route path="/research" element={<ResearchPage />} />
-          <Route path="/research/maker" element={<ResearchMakerPage />} />
-          <Route path="/roadmap" element={<RoadmapPage />} />
-          <Route path="/resources" element={<ResourcesPage />} />
+          <Route path="/domains" element={requireSession(<DomainsPage />)} />
+          <Route path="/interview" element={requireSession(<InterviewPage />)} />
+          <Route path="/interview/start" element={requireSession(<Suspense fallback={<main className="page-shell interview-experience"><div className="wrap">Loading interview setup...</div></main>}><InterviewExperiencePage /></Suspense>)} />
+          <Route path="/resume" element={requireSession(resumePage)} />
+          <Route path="/resume/:section" element={requireSession(resumePage)} />
+          <Route path="/assessment" element={requireSession(<AssessmentPage />)} />
+          <Route path="/assessment/start" element={requireSession(<Suspense fallback={<main className="page-shell skill-assessment-page"><div className="wrap">Loading your assessment...</div></main>}><SkillAssessmentPage /></Suspense>)} />
+          <Route path="/research" element={requireSession(<ResearchPage />)} />
+          <Route path="/research/maker" element={requireSession(<ResearchMakerPage />)} />
+          <Route path="/roadmap" element={requireSession(<RoadmapPage />)} />
+          <Route path="/resources" element={requireSession(<ResourcesPage />)} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/pricing" element={<PricingPage user={session} onLogout={handleLogout} />} />
           <Route path="/login" element={session ? <Navigate to={requestedPath} replace /> : <LoginPage onLogin={handleLogin} />} />
           <Route path="/register" element={session ? <Navigate to={requestedPath} replace /> : <RegisterPage onLogin={handleLogin} />} />
-          <Route path="/dashboard" element={session ? <DashboardPage user={session} /> : <Navigate to="/login" replace />} />
+          <Route path="/dashboard" element={requireSession(<DashboardPage user={session} />)} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>

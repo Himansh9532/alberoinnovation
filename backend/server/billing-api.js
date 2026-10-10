@@ -1,8 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { handleCors } from "./cors.js";
+import { addCalendarMonths, getPlanPricePaise } from "../../shared/plan-pricing.js";
 
 const PLAN_LIMITS = {
   free: {
@@ -30,9 +32,6 @@ const PLAN_LIMITS = {
     maxAssessmentQuestions: 20,
   },
 };
-const PLAN_PRICES = { plus: 99900, pro: 199900 };
-const PAID_PLAN_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -87,7 +86,7 @@ function getFirebaseAdmin() {
   };
 }
 
-async function authenticateRequest(request) {
+export async function authenticateRequest(request) {
   const authorization = request.headers?.authorization || request.headers?.Authorization;
   const match = typeof authorization === "string" && authorization.match(/^Bearer\s+(.+)$/i);
   if (!match) throw createHttpError(401, "Sign in with your SkillAI account to use plans and AI practice.", "AUTH_REQUIRED");
@@ -112,6 +111,136 @@ function toDate(value) {
   if (value?.toDate) return value.toDate();
   if (value instanceof Date) return value;
   return null;
+}
+
+function isEmailAddress(value) {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
+export function buildPaymentReceiptEmail({ customerEmail, adminEmail, fromEmail, order, paymentId, paidAt, expiresAt }) {
+  if (![customerEmail, adminEmail, fromEmail].every(isEmailAddress)) {
+    throw new Error("A valid customer, admin, and SES sender email are required to send a receipt.");
+  }
+  const paidDate = toDate(paidAt);
+  const expiryDate = toDate(expiresAt);
+  if (!paidDate || !expiryDate) throw new Error("Payment and plan expiry dates are required to send a receipt.");
+
+  const planName = order.plan === "pro" ? "Pro" : "Plus";
+  const term = `${order.months} ${order.months === 1 ? "month" : "months"}`;
+  const amount = new Intl.NumberFormat("en-IN", { style: "currency", currency: order.currency }).format(order.amount / 100);
+  const dateOptions = { dateStyle: "long", timeZone: "Asia/Kolkata" };
+  const paidDateText = new Intl.DateTimeFormat("en-IN", dateOptions).format(paidDate);
+  const expiryDateText = new Intl.DateTimeFormat("en-IN", dateOptions).format(expiryDate);
+  const details = [
+    ["Plan", `${planName} · ${term}`],
+    ["Amount paid", amount],
+    ["Payment ID", paymentId],
+    ["Order ID", order.id],
+    ["Payment date", paidDateText],
+    ["Plan valid through", expiryDateText],
+  ];
+  const text = [
+    "Thank you for your SkillAI purchase. This is your payment receipt (not a GST tax invoice).",
+    "",
+    ...details.map(([label, value]) => `${label}: ${value}`),
+  ].join("\n");
+  const html = `<p>Thank you for your SkillAI purchase. This is your payment receipt (not a GST tax invoice).</p><table>${details
+    .map(([label, value]) => `<tr><th align="left">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+    .join("")}</table>`;
+
+  return {
+    FromEmailAddress: fromEmail,
+    Destination: {
+      ToAddresses: [customerEmail],
+      BccAddresses: [adminEmail],
+    },
+    Content: {
+      Simple: {
+        Subject: { Data: "Your SkillAI payment receipt", Charset: "UTF-8" },
+        Body: {
+          Text: { Data: text, Charset: "UTF-8" },
+          Html: { Data: html, Charset: "UTF-8" },
+        },
+      },
+    },
+  };
+}
+
+async function sendPaymentReceipt(db, orderRef, order, paymentId) {
+  let claim;
+  try {
+    claim = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(orderRef);
+      const currentOrder = snapshot.data();
+      if (currentOrder.receiptEmailStatus === "sent") return "sent";
+
+      const attemptedAt = toDate(currentOrder.receiptEmailAttemptedAt);
+      if (
+        currentOrder.receiptEmailStatus === "sending"
+        && attemptedAt
+        && Date.now() - attemptedAt.getTime() < 5 * 60 * 1000
+      ) {
+        return "pending";
+      }
+
+      transaction.set(orderRef, {
+        receiptEmailStatus: "sending",
+        receiptEmailAttemptedAt: Timestamp.now(),
+      }, { merge: true });
+      return "send";
+    });
+  } catch (error) {
+    console.error("Payment receipt delivery could not be started:", error.message || "Unknown Firestore error");
+    return { sent: false, error: "The payment is active, but receipt delivery could not be started. Please contact support." };
+  }
+  if (claim === "sent") return { sent: true };
+  if (claim === "pending") return { sent: false, pending: true };
+
+  try {
+    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+    const fromEmail = process.env.SES_FROM_EMAIL;
+    const adminEmail = process.env.PAYMENT_RECEIPT_ADMIN_EMAIL;
+    if (!region || !fromEmail || !adminEmail) {
+      throw new Error("SES region, sender, and receipt admin email must be configured.");
+    }
+    const email = buildPaymentReceiptEmail({
+      customerEmail: order.customerEmail,
+      adminEmail,
+      fromEmail,
+      order: { ...order, id: orderRef.id },
+      paymentId,
+      paidAt: order.paidAt,
+      expiresAt: order.planExpiresAt,
+    });
+    await new SESv2Client({ region }).send(new SendEmailCommand(email));
+    await orderRef.set({
+      receiptEmailStatus: "sent",
+      receiptEmailSentAt: FieldValue.serverTimestamp(),
+      receiptEmailAttemptedAt: FieldValue.delete(),
+    }, { merge: true });
+    return { sent: true };
+  } catch (error) {
+    console.error("Payment receipt email delivery failed:", error.message || "Unknown SES error");
+    try {
+      await orderRef.set({
+        receiptEmailStatus: "failed",
+        receiptEmailAttemptedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (statusError) {
+      console.error("Payment receipt delivery status could not be saved:", statusError.message || "Unknown Firestore error");
+    }
+    return { sent: false, error: "The payment is active, but the receipt email could not be sent. Please contact support." };
+  }
 }
 
 function normalizePlanRecord(data = {}) {
@@ -276,10 +405,13 @@ export async function handleCreateRazorpayOrder(request, response) {
   }
 
   try {
-    const { uid } = await authenticateRequest(request);
-    const plan = readRequestBody(request.body).plan;
-    if (plan !== "plus" && plan !== "pro") {
+    const { uid, email } = await authenticateRequest(request);
+    const { plan, months } = readRequestBody(request.body);
+    if ((plan !== "plus" && plan !== "pro") || ![1, 3, 6, 12].includes(months)) {
       throw createHttpError(400, "Choose a valid paid plan.", "INVALID_PLAN");
+    }
+    if (!isEmailAddress(email)) {
+      throw createHttpError(400, "Add a valid email address to your SkillAI account to receive payment receipts.", "CUSTOMER_EMAIL_REQUIRED");
     }
 
     const keyId = process.env.RAZORPAY_KEY_ID;
@@ -289,7 +421,7 @@ export async function handleCreateRazorpayOrder(request, response) {
     }
 
     const { db } = getFirebaseAdmin();
-    const amount = PLAN_PRICES[plan];
+    const amount = getPlanPricePaise(plan, months);
     const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: {
@@ -300,7 +432,7 @@ export async function handleCreateRazorpayOrder(request, response) {
         amount,
         currency: "INR",
         receipt: `skillai_${uid.slice(0, 12)}_${Date.now()}`,
-        notes: { uid, plan },
+        notes: { uid, plan, months: String(months) },
       }),
       signal: AbortSignal.timeout(15000),
     });
@@ -312,7 +444,9 @@ export async function handleCreateRazorpayOrder(request, response) {
 
     await db.collection("razorpayOrders").doc(order.id).create({
       uid,
+      customerEmail: email,
       plan,
+      months,
       amount,
       currency: "INR",
       status: "created",
@@ -324,6 +458,7 @@ export async function handleCreateRazorpayOrder(request, response) {
       amount,
       currency: "INR",
       plan,
+      months,
     });
   } catch (error) {
     sendJson(response, error.statusCode || 502, {
@@ -373,7 +508,14 @@ export async function handleVerifyRazorpayPayment(request, response) {
     }
     if (order.status === "paid" && order.paymentId === paymentId) {
       const planSnapshot = await db.collection("skillaiPlans").doc(uid).get();
-      sendJson(response, 200, { success: true, plan: planSnapshot.data()?.plan || order.plan });
+      const receipt = await sendPaymentReceipt(db, orderRef, order, paymentId);
+      sendJson(response, 200, {
+        success: true,
+        plan: planSnapshot.data()?.plan || order.plan,
+        receiptEmailSent: receipt.sent,
+        receiptEmailPending: receipt.pending || false,
+        receiptEmailError: receipt.error || null,
+      });
       return;
     }
 
@@ -393,7 +535,7 @@ export async function handleVerifyRazorpayPayment(request, response) {
     }
 
     const userRef = db.collection("skillaiPlans").doc(uid);
-    await db.runTransaction(async (transaction) => {
+    const receiptDates = await db.runTransaction(async (transaction) => {
       const [currentOrderSnapshot, userSnapshot, paymentSnapshot] = await Promise.all([
         transaction.get(orderRef),
         transaction.get(userRef),
@@ -403,18 +545,28 @@ export async function handleVerifyRazorpayPayment(request, response) {
       if (!currentOrderSnapshot.exists || currentOrder.uid !== uid) {
         throw createHttpError(403, "This order does not belong to your account.", "ORDER_NOT_FOUND");
       }
-      if (currentOrder.status === "paid" && currentOrder.paymentId === paymentId) return;
+      if (currentOrder.status === "paid" && currentOrder.paymentId === paymentId) {
+        return {
+          paidAt: toDate(currentOrder.paidAt),
+          planExpiresAt: toDate(currentOrder.planExpiresAt),
+        };
+      }
       if (paymentSnapshot.exists) {
         throw createHttpError(409, "This payment has already been applied to an account.", "PAYMENT_ALREADY_APPLIED");
       }
 
       const previousPlan = normalizePlanRecord(userSnapshot.exists ? userSnapshot.data() : {});
+      const purchasedMonths = [1, 3, 6, 12].includes(currentOrder.months) ? currentOrder.months : 1;
       const expiresBase = previousPlan.planExpiresAt && previousPlan.planExpiresAt.getTime() > Date.now()
-        ? previousPlan.planExpiresAt.getTime()
-        : Date.now();
-      const expiresAt = new Date(expiresBase + PAID_PLAN_DURATION_MS);
+        ? previousPlan.planExpiresAt
+        : new Date();
+      const expiresAt = addCalendarMonths(expiresBase, purchasedMonths);
+      const paidAt = Number.isFinite(payment.created_at) && payment.created_at > 0
+        ? new Date(payment.created_at * 1000)
+        : new Date();
       transaction.set(userRef, {
         plan: currentOrder.plan,
+        months: purchasedMonths,
         planExpiresAt: Timestamp.fromDate(expiresAt),
         freeUsed: previousPlan.freeUsed,
         usageMonth: previousPlan.usageMonth,
@@ -425,18 +577,28 @@ export async function handleVerifyRazorpayPayment(request, response) {
       transaction.set(orderRef, {
         status: "paid",
         paymentId,
-        paidAt: FieldValue.serverTimestamp(),
+        paidAt: Timestamp.fromDate(paidAt),
+        planExpiresAt: Timestamp.fromDate(expiresAt),
       }, { merge: true });
       transaction.create(db.collection("razorpayPayments").doc(paymentId), {
         uid,
         orderId,
         plan: currentOrder.plan,
         amount: currentOrder.amount,
-        paidAt: FieldValue.serverTimestamp(),
+        paidAt: Timestamp.fromDate(paidAt),
       });
+      return { paidAt, planExpiresAt: expiresAt };
     });
 
-    sendJson(response, 200, { success: true, plan: order.plan });
+    const receiptOrder = { ...order, ...receiptDates };
+    const receipt = await sendPaymentReceipt(db, orderRef, receiptOrder, paymentId);
+    sendJson(response, 200, {
+      success: true,
+      plan: order.plan,
+      receiptEmailSent: receipt.sent,
+      receiptEmailPending: receipt.pending || false,
+      receiptEmailError: receipt.error || null,
+    });
   } catch (error) {
     sendJson(response, error.statusCode || 502, {
       error: error.message || "Payment verification failed.",

@@ -12,6 +12,7 @@
     "generate:avatars": "node scripts/generate-interviewer-avatars.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1148.0",
     "docx": "^9.9.0",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",

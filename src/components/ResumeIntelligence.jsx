@@ -21,7 +21,6 @@ import {
   UserRound,
   UploadCloud,
 } from "lucide-react";
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { getFirebaseIdToken } from "../data/firebaseAuth";
 import { apiUrl } from "../data/api";
@@ -30,12 +29,6 @@ const PROFILE_KEY = "skillai-resume-profile";
 const RESUME_KEY = "skillai-resume-text";
 const VERSIONS_KEY = "skillai-resume-versions";
 const JOB_FEED_CACHE_TTL = 60 * 60 * 1000;
-const JOB_FEED_HOMEPAGES = {
-  Arbeitnow: "https://www.arbeitnow.com/",
-  "Remote OK": "https://remoteok.com/",
-  Jobicy: "https://jobicy.com/",
-  Adzuna: "https://www.adzuna.in/",
-};
 let publicJobFeedCache = null;
 const ROLES = [
   { sector: "Engineering & Technology", name: "Software Developer", skills: ["JavaScript", "Python", "Java", "software development", "Git", "testing", "API"] },
@@ -132,6 +125,50 @@ function includesTerm(text, term) {
   return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(text);
 }
 
+function extractExperienceValues(text) {
+  const values = [];
+  if (!text) return values;
+
+  const explicitPatterns = [
+    /(min(?:imum)?|at\s+least|atleast|required|need(?:s|ed)?)\s*(?:experience|exp)?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)\b/gi,
+    /(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)\b/gi,
+    /(\d+(?:\.\d+)?)\s*(?:-|to|–|—)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)\b/gi,
+  ];
+
+  for (const pattern of explicitPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const first = Number.parseFloat(match[1]);
+      const second = match[2] ? Number.parseFloat(match[2]) : null;
+      if (!Number.isNaN(first)) values.push(first);
+      if (second !== null && !Number.isNaN(second)) values.push(second);
+    }
+  }
+
+  return values.filter((value) => Number.isFinite(value) && value >= 0);
+}
+
+function summarizeExperienceYears(text, mode = "max") {
+  const values = extractExperienceValues(text);
+  if (!values.length) return 0;
+  return mode === "min" ? Math.min(...values) : Math.max(...values);
+}
+
+function jobRequiresMoreExperienceThanResume(jobText, candidateExperienceYears) {
+  if (!candidateExperienceYears && candidateExperienceYears !== 0) return false;
+
+  const text = String(jobText || "");
+  if (!text) return false;
+  if (/\b(fresher|entry[- ]level|graduate trainee|junior|intern|0\s*[-+]?\s*years?\s*(?:experience|exp)?)\b/i.test(text)) {
+    return false;
+  }
+
+  const hasExplicitExperienceRequirement = /\b(?:min(?:imum)?|at\s+least|atleast|required|need(?:s|ed)?)\b.*(?:experience|exp)|(?:experience|exp).*\b(?:min(?:imum)?|at\s+least|atleast|required|need(?:s|ed)?)\b|\b\d+(?:\.\d+)?\s*(?:\+)?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)\b|\b\d+(?:\.\d+)?\s*(?:-|to|–|—)\s*\d+(?:\.\d+)?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)\b/i.test(text);
+  if (!hasExplicitExperienceRequirement) return false;
+
+  const minimumExperienceYears = summarizeExperienceYears(text, "min");
+  return minimumExperienceYears > 0 && candidateExperienceYears < minimumExperienceYears;
+}
+
 function plainText(value) {
   if (!value) return "";
   const document = new DOMParser().parseFromString(value, "text/html");
@@ -218,6 +255,30 @@ async function fetchFeedJson(url, source, signal) {
   return response.json();
 }
 
+async function requestResumeAI(payload) {
+  const token = await getFirebaseIdToken();
+  const response = await fetch(apiUrl("/api/resume-assistant"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("Resume AI returned an unreadable response. Please try again.");
+  }
+  if (!response.ok) throw new Error(result.error || "Resume AI could not complete this request.");
+  if (!result?.result || typeof result.result !== "object") {
+    throw new Error("Resume AI returned an incomplete result. Please try again.");
+  }
+  return result.result;
+}
+
 async function loadPublicJobFeeds() {
   if (publicJobFeedCache && Date.now() - publicJobFeedCache.fetchedAt < JOB_FEED_CACHE_TTL) {
     return { ...publicJobFeedCache, cached: true };
@@ -253,7 +314,7 @@ async function loadPublicJobFeeds() {
 }
 
 function normalizeAdzuna(payload) {
-  if (!Array.isArray(payload?.jobs)) throw new Error("Adzuna returned an unexpected job-search response.");
+  if (!Array.isArray(payload?.jobs)) throw new Error("India listings returned an unexpected response.");
   return payload.jobs.map((job) => createJobRecord(job)).filter(Boolean);
 }
 
@@ -265,7 +326,12 @@ async function loadIndiaJobFeed(location) {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Adzuna India search could not be completed.");
+  if (!response.ok) {
+    const message = typeof payload.error === "string"
+      ? payload.error.replace(/\bAdzuna\b/gi, "India job feed")
+      : "India job search could not be completed.";
+    throw new Error(message);
+  }
   return {
     jobs: normalizeAdzuna(payload),
     fetchedAt: payload.fetchedAt || Date.now(),
@@ -334,6 +400,7 @@ function resumeTextToParagraphs(text) {
 }
 
 async function downloadDocx(title, text) {
+  const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
   const paragraphs = resumeTextToParagraphs(text).map((line, index) => new Paragraph({
     heading: index === 0 ? HeadingLevel.TITLE : undefined,
     children: [new TextRun({ text: line, bold: index === 0 })],
@@ -357,6 +424,8 @@ function MetricCard({ label, value, note }) {
 }
 
 function ResumeUpload({ onRead, status, busy, error, compact = false }) {
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleFile = async (file) => {
     if (!file) return;
     onRead(null, "Reading resume locally…", true, "");
@@ -368,25 +437,57 @@ function ResumeUpload({ onRead, status, busy, error, compact = false }) {
       onRead(null, "", false, readError.message || "The resume could not be read.");
     }
   };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (!busy) void handleFile(event.dataTransfer.files?.[0]);
+  };
+
   return (
-    <label className={`ri-upload${compact ? " compact" : ""}`}>
-      <input type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; void handleFile(file); }} />
-      {!compact && <UploadCloud size={24} />}
-      <strong>{busy ? "Reading your resume…" : compact ? "Upload or replace resume" : "Choose a resume file"}</strong>
-      {!compact && <small>PDF, DOC, DOCX, or TXT · up to 10 MB. Text stays in this browser.</small>}
-      {status && <span>{status}</span>}
-      {error && <span className="ri-error" role="alert">{error}</span>}
+    <label
+      className={`ri-upload${compact ? " compact" : ""}${isDragging ? " is-dragging" : ""}${busy ? " is-busy" : ""}`}
+      onDragOver={(event) => { event.preventDefault(); if (!busy) setIsDragging(true); }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsDragging(false);
+      }}
+      onDrop={handleDrop}
+    >
+      <input
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+        aria-label={compact ? "Upload or replace resume" : "Choose a resume file"}
+        disabled={busy}
+        onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; void handleFile(file); }}
+      />
+      {!compact && <span className="ri-upload-icon"><UploadCloud size={22} /></span>}
+      <span className="ri-upload-content">
+        <strong>
+          {busy ? "Reading your resume…" : compact
+            ? "Upload or replace resume"
+            : isDragging
+              ? "Drop to upload your resume"
+              : "Drop your resume here"}
+        </strong>
+        {!compact && <span className="ri-upload-browse">{busy ? "Please wait…" : "Browse files"}</span>}
+        {!compact && <small>PDF, DOC, DOCX, or TXT · up to 10 MB</small>}
+        {status && <span className="ri-upload-status" role="status">{status}</span>}
+        {error && <span className="ri-error" role="alert">{error}</span>}
+      </span>
     </label>
   );
 }
 
-function JobSearch({ analysis }) {
+function JobSearch({ analysis, resumeText = "" }) {
   const [keywords, setKeywords] = useState("");
   const [keywordsEdited, setKeywordsEdited] = useState(false);
   const [locationMode, setLocationMode] = useState("any");
+  const [useAIMatching, setUseAIMatching] = useState(false);
+  const candidateExperienceYears = useMemo(() => summarizeExperienceYears(resumeText, "max"), [resumeText]);
   const [location, setLocation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [aiError, setAiError] = useState("");
   const [feedErrors, setFeedErrors] = useState([]);
   const [results, setResults] = useState([]);
   const [searchInfo, setSearchInfo] = useState(null);
@@ -406,10 +507,14 @@ function JobSearch({ analysis }) {
     }
   }, [analysis, keywordsEdited]);
 
+  useEffect(() => {
+    if (resumeText.length > 12000) setUseAIMatching(false);
+  }, [resumeText]);
+
   const runSearch = async () => {
     setError("");
     const terms = [...new Set(keywords.split(/[,;\n]+/).map((term) => term.trim()).filter(Boolean))];
-    if (!terms.length) {
+    if (!terms.length && !(useAIMatching && resumeText.trim().length >= 80 && resumeText.length <= 12000)) {
       setError("Add at least one keyword, or upload a resume with recognizable skills to prefill this field.");
       return;
     }
@@ -446,29 +551,72 @@ function JobSearch({ analysis }) {
         fetchedAt = Math.max(fetchedAt, indiaResult.value.fetchedAt);
         cached = cached && indiaResult.value.cached;
       } else {
-        errors.push(`Adzuna India: ${indiaResult.reason?.message || "Could not load India listings."}`);
+        errors.push(`India listings: ${indiaResult.reason?.message || "Could not load listings."}`);
       }
       if (!jobs.length && errors.length) throw new Error(errors.join(" "));
-      const matching = jobs.map((job) => ({
+      const keywordMatches = jobs.map((job) => ({
         ...job,
         matchedTerms: terms.filter((term) => includesTerm(`${job.title} ${job.company} ${job.location} ${job.tags.join(" ")} ${job.description}`, term)),
       })).filter((job) => {
-        if (!job.matchedTerms.length) return false;
         if (locationMode === "remote" && !job.remote) return false;
         if (locationMode === "specific") {
           if (job.source === "Adzuna") return true;
           if (!matchesLocation(job, location)) return false;
         }
+        if (jobRequiresMoreExperienceThanResume(`${job.title} ${job.description} ${job.tags.join(" ")}`, candidateExperienceYears)) return false;
         return true;
-      }).sort((first, second) => (Date.parse(second.date) || 0) - (Date.parse(first.date) || 0));
+      });
+      let matching;
+      let matchingMode = "keyword";
+      setAiError("");
+      if (useAIMatching && resumeText.trim().length >= 80 && resumeText.length <= 12000) {
+        const candidates = [...keywordMatches]
+          .sort((first, second) => second.matchedTerms.length - first.matchedTerms.length || (Date.parse(second.date) || 0) - (Date.parse(first.date) || 0))
+          .slice(0, 30);
+        try {
+          if (!candidates.length) {
+            matching = [];
+            matchingMode = "keyword";
+          } else {
+          const aiResult = await requestResumeAI({
+            action: "match-jobs",
+            resumeText,
+            jobs: candidates.map((job, index) => ({
+              id: `job-${index}`,
+              title: job.title,
+              company: job.company,
+              location: job.location,
+              remote: job.remote,
+              tags: job.tags.slice(0, 15),
+              description: job.description.slice(0, 1200),
+            })),
+          });
+          const candidateById = new Map(candidates.map((job, index) => [`job-${index}`, job]));
+          matching = aiResult.matches.map((match) => {
+            const job = candidateById.get(match.jobId);
+            return job ? { ...job, aiMatch: match } : null;
+          }).filter(Boolean).sort((first, second) => second.aiMatch.score - first.aiMatch.score);
+          matchingMode = "AI-assisted text relevance";
+          }
+        } catch (matchError) {
+          setAiError(`AI matching could not be completed: ${matchError.message} Showing keyword matches instead.`);
+          matching = keywordMatches
+            .filter((job) => job.matchedTerms.length > 0)
+            .sort((first, second) => second.matchedTerms.length - first.matchedTerms.length || (Date.parse(second.date) || 0) - (Date.parse(first.date) || 0));
+        }
+      } else {
+        matching = keywordMatches
+          .filter((job) => job.matchedTerms.length > 0)
+          .sort((first, second) => second.matchedTerms.length - first.matchedTerms.length || (Date.parse(second.date) || 0) - (Date.parse(first.date) || 0));
+      }
       setResults(matching);
       setFeedErrors(errors);
       setSearchInfo({
         fetchedAt,
         cached,
-        feeds: [...new Set(jobs.map((job) => job.source))],
         scanned: jobs.length,
         terms,
+        matchingMode,
       });
     } catch (searchError) {
       setError(searchError.message || "Could not load public job listings. Please try again.");
@@ -486,13 +634,15 @@ function JobSearch({ analysis }) {
       <section className="ri-card ri-job-search-intro">
         <div className="ri-card-title-row">
           <span className="ri-card-icon target"><Search size={18} /></span>
-          <div><h2>Find current listings, including jobs in India</h2><p>Upload a resume above to prefill keywords, or enter them yourself. Resume text and keywords stay in your browser; an optional country/city filter is sent to Adzuna to find local listings.</p></div>
+          <div><h2>Find current listings, including jobs in India</h2><p>Upload a resume above to prefill keywords, or enter them yourself. Resume text and keywords stay in your browser; an optional country/city filter helps find local listings.</p></div>
         </div>
         <form className="ri-job-search-form" onSubmit={handleSearch}>
           <label className="ri-job-keywords">Keywords from your resume or profile
             <input value={keywords} onChange={(event) => { setKeywords(event.target.value); setKeywordsEdited(true); }} placeholder={analysis?.foundSkills.length ? analysis.foundSkills.slice(0, 6).join(", ") : "e.g. project management, nursing, Python"} />
             <small>{analysis ? `${analysis.foundSkills.length} catalog terms detected in extracted text. Edit this list before searching.` : "Upload a resume to prefill detected terms, or type terms separated by commas."}</small>
           </label>
+          {resumeText.trim().length >= 80 && resumeText.length <= 12000 && <label className="ri-ai-consent"><input type="checkbox" checked={useAIMatching} onChange={(event) => setUseAIMatching(event.target.checked)} /><span><strong>Use AI to rank relevant jobs</strong><small>When enabled, your resume and up to 30 public listing summaries are sent to the AI provider for this search. You can leave this off for keyword matching.</small></span></label>}
+          {resumeText.length > 12000 && <p className="ri-job-warning" role="status">This resume exceeds the 12,000-character AI limit. Shorten it before using AI; keyword job search is still available.</p>}
           <div className="ri-job-location-row">
             <label>Location
               <select value={locationMode} onChange={(event) => setLocationMode(event.target.value)}>
@@ -504,37 +654,38 @@ function JobSearch({ analysis }) {
             {locationMode === "specific" && <label>Country or city
               <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="e.g. India, Mumbai, London" />
             </label>}
-            <button type="submit" className="primary-button" disabled={isLoading}><Search size={16} />{isLoading ? "Searching feeds…" : "Find jobs"}</button>
+            <button type="submit" className="primary-button" disabled={isLoading}><Search size={16} />{isLoading ? (useAIMatching ? "Finding AI matches…" : "Searching feeds…") : "Find jobs"}</button>
           </div>
           {error && <p className="ri-job-error" role="alert">{error}</p>}
+          {aiError && <p className="ri-job-warning" role="status">{aiError}</p>}
         </form>
       </section>
 
       {searchInfo && <>
         <div className="ri-job-results-heading">
-          <div><span className="eyebrow">PUBLIC FEED RESULTS</span><h2>{results.length} listings matched</h2><p>Selected keywords: {searchInfo.terms.join(", ")}. Matched at least one term in the title, company, location, tags, or description. This is a keyword filter, not a qualification or job-fit assessment.</p></div>
+          <div><span className="eyebrow">JOB RESULTS</span><h2>{results.length} listings matched</h2><p>{searchInfo.matchingMode === "AI-assisted text relevance" ? "AI ranked resume-to-listing text relevance. This is not an ATS score or hiring prediction." : `Matched one or more keywords: ${searchInfo.terms.join(", ")}. Keyword matches only—not a job-fit assessment.`}</p></div>
           <button type="button" className="secondary-button" onClick={() => void runSearch()} disabled={isLoading}>Search again</button>
         </div>
         <div className="ri-job-feed-note">
           <span>Checked {searchInfo.scanned} listings{searchInfo.cached ? " from the one-hour browser cache" : ""}</span>
-          <span>Sources: {searchInfo.feeds.length ? searchInfo.feeds.map((source) => <a href={JOB_FEED_HOMEPAGES[source]} target="_blank" rel="noopener noreferrer" key={source}>{source}</a>) : "none returned listings"}</span>
           <span>{new Date(searchInfo.fetchedAt).toLocaleString()}</span>
         </div>
         {feedErrors.map((feedError) => <p className="ri-job-warning" role="status" key={feedError}>{feedError}</p>)}
         {results.length ? <div className="ri-live-job-list">{results.slice(0, visibleCount).map((job) => (
           <article className="ri-live-job-card" key={job.id}>
             <div className="ri-live-job-top">
-              <div><span className="ri-job-source">{job.source}</span><h3>{job.title}</h3><p>{job.company} · {job.location}</p></div>
-              <span className="ri-job-date">{job.date ? new Date(job.date).toLocaleDateString() : "Date not listed"}</span>
+              <div><h3>{job.title}</h3><p>{job.company} · {job.location}</p></div>
+              <span className={job.aiMatch ? "ri-ai-match-score" : "ri-job-date"}>{job.aiMatch ? `AI relevance · ${job.aiMatch.score}/100` : job.date ? new Date(job.date).toLocaleDateString() : "Date not listed"}</span>
             </div>
+            {job.aiMatch ? <div className="ri-ai-match-notes"><InfoRows label="Why it may fit" values={job.aiMatch.reasons} empty="" />{job.aiMatch.considerations.length > 0 && <InfoRows label="Check before applying" values={job.aiMatch.considerations} empty="" />}</div> : null}
             <div className="ri-job-tags">{job.matchedTerms.map((term) => <span key={term}>{term}</span>)}</div>
             {job.tags.length > 0 && <p className="ri-job-original-tags">Listing tags: {job.tags.slice(0, 8).join(" · ")}</p>}
             <p className="ri-live-job-description">{job.description ? `${job.description.slice(0, 360)}${job.description.length > 360 ? "…" : ""}` : "Description not provided in the feed."}</p>
-            <div className="ri-live-job-footer"><span>{[job.remote ? "Remote" : "", job.jobType].filter(Boolean).join(" · ") || "See listing for work arrangement"}</span><a href={job.url} target="_blank" rel="noopener noreferrer">{job.source} listing <ExternalLink size={14} /></a></div>
+            <div className="ri-live-job-footer"><span>{[job.remote ? "Remote" : "", job.jobType].filter(Boolean).join(" · ") || "See listing for work arrangement"}</span><a href={job.url} target="_blank" rel="noopener noreferrer">Open listing <ExternalLink size={14} /></a></div>
           </article>
         ))}</div> : <div className="ri-empty-filter">No listing in these feed results matched your keywords and location. Try fewer keywords, choose “Any location,” or search again later.</div>}
         {results.length > visibleCount && <button type="button" className="secondary-button ri-load-more" onClick={() => setVisibleCount((count) => count + 12)}>Show more matching listings</button>}
-        <p className="ri-disclaimer">India listings are supplied by Adzuna when server credentials are configured; worldwide/APAC remote listings are additional results, not local-office roles. Other feeds have limited coverage and this is not the entire job market. Availability, eligibility, location and application status can change. Verify details on the employer’s original listing before applying.</p>
+        <p className="ri-disclaimer">India listings may appear alongside worldwide/APAC remote roles, which are not necessarily local-office positions. Available listings are not the entire job market. Availability, eligibility, location and application status can change. Verify details on the employer’s original listing before applying.</p>
       </>}
     </div>
   );
@@ -552,7 +703,7 @@ function ResumeIntelligence({ user }) {
     analyzer: ["Resume Analyzer", "Review text extracted from your resume and verify every finding.", FileText],
     builder: ["Resume Builder", "Create a clear, single-column resume from details you provide.", ListChecks],
     optimizer: ["Job Description Match", "Find exact catalog terms shared with a job description.", Target],
-    "job-match": ["Job Match", "Find live public job listings using keywords from your resume.", BriefcaseBusiness],
+    "job-match": ["Job Match", "Find live listings and optionally rank them against your resume with AI.", BriefcaseBusiness],
     tailor: ["Resume Tailor", "Focus an existing resume on one role without adding new claims.", Sparkles],
     "skill-gaps": ["Skill Gap Analysis", "Compare evidenced skills with a target role.", GraduationCap],
     "project-analyzer": ["Project Analyzer", "Evaluate project evidence and describe it professionally.", FolderKanban],
@@ -568,9 +719,16 @@ function ResumeIntelligence({ user }) {
   const [notice, setNotice] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [aiLoading, setAiLoading] = useState("");
+  const [aiError, setAiError] = useState("");
+  const [aiResults, setAiResults] = useState({});
   const [versions, setVersions] = useState(() => readStored(versionsStorageKey, []));
   const [comparisonIds, setComparisonIds] = useState(["", ""]);
   const [project, setProject] = useState({ name: "", description: "", github: "", liveUrl: "", documentation: "", technologies: "" });
+
+  useEffect(() => {
+    setAiError("");
+  }, [route]);
 
   const analysis = useMemo(() => scanResume(resumeText), [resumeText]);
   const role = ROLES.find((item) => item.name === targetRole) || null;
@@ -596,6 +754,8 @@ function ResumeIntelligence({ user }) {
       const nextProfile = { ...profile, resumeText: text, source: "uploaded resume" };
       setProfile(nextProfile);
       writeStored(profileStorageKey, nextProfile);
+      setAiResults({});
+      setAiError("");
       setNotice("Resume text saved locally on this device.");
     }
   };
@@ -616,7 +776,48 @@ function ResumeIntelligence({ user }) {
     setResumeText("");
     setUploadStatus("");
     setUploadError("");
+    setAiResults({});
+    setAiError("");
     setNotice("Resume text removed from this browser.");
+  };
+
+  const runAI = async (action, details = {}) => {
+    if (resumeText.trim().length < 80) {
+      setAiError("Add a resume with at least 80 readable characters before using resume AI.");
+      return;
+    }
+    if (resumeText.length > 12000) {
+      setAiError("Resume AI supports up to 12,000 characters. Shorten the resume before trying again.");
+      return;
+    }
+    setAiError("");
+    setAiLoading(action);
+    setAiResults((current) => ({ ...current, [action]: null }));
+    try {
+      const result = await requestResumeAI({
+        action,
+        resumeText,
+        ...details,
+      });
+      setAiResults((current) => ({ ...current, [action]: result }));
+    } catch (error) {
+      setAiError(error.message || "Resume AI could not complete this request. Please try again.");
+    } finally {
+      setAiLoading("");
+    }
+  };
+
+  const applyTailoredDraft = () => {
+    const draft = aiResults.tailor?.draft;
+    if (!draft) return;
+    const now = new Date().toISOString();
+    const nextVersions = [
+      ...versions,
+      { id: Date.now(), label: "Before AI tailoring", role: targetRole || "Original resume", text: resumeText, date: now },
+    ];
+    setVersions(nextVersions);
+    writeStored(versionsStorageKey, nextVersions);
+    handleResumeRead(draft, "AI-tailored draft saved locally. Your original is available in Resume Versions.", false, "");
   };
 
   const addVersion = () => {
@@ -662,7 +863,7 @@ function ResumeIntelligence({ user }) {
               ))}
             </div>
           ))}
-          <div className="ri-sidebar-privacy"><ShieldCheck size={16} /><span>Your resume data stays in this browser.</span></div>
+          <div className="ri-sidebar-privacy"><ShieldCheck size={16} /><span>Your resume stays here unless you choose an AI action.</span></div>
         </aside>
 
         <section className="ri-content">
@@ -672,13 +873,15 @@ function ResumeIntelligence({ user }) {
           </header>
 
           {notice && <div className="ri-notice" role="status"><Check size={16} />{notice}</div>}
+          {aiError && route !== "job-match" && <p className="ri-job-error" role="alert">{aiError}</p>}
 
           {(route === "dashboard" || route === "analyzer") ? (
             <section className={`ri-upload-panel${resumeText ? " has-resume" : " is-empty"}`}>
               <div className="ri-upload-copy">
-                <span className="ri-upload-kicker">{resumeText ? "RESUME ON THIS DEVICE" : "GET STARTED"}</span>
-                <strong>{resumeText ? "Your resume text is ready to review" : "Start with a resume you already have"}</strong>
-                <p>{resumeText ? "Review the extracted text before using term checks. Replace it any time; your resume stays in this browser." : "Upload a PDF, Word document, or text file. We’ll extract its text locally so you can review it and use the career tools."}</p>
+                <span className="ri-upload-kicker">{resumeText ? "RESUME READY" : "START WITH YOUR RESUME"}</span>
+                <strong>{resumeText ? "Your resume is ready to review" : "Bring your experience into focus"}</strong>
+                <p>{resumeText ? "Review the extracted text before using career tools. Your file stays on this device unless you choose an AI action." : "Upload an existing resume and we’ll extract its text locally, so you can review it before using career tools."}</p>
+                <span className="ri-upload-privacy"><ShieldCheck size={15} /> Stored in this browser · sent for AI review only when you choose an AI action</span>
                 {resumeText && <button type="button" className="ri-clear-button" onClick={clearResume}>Remove saved resume</button>}
               </div>
               <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} />
@@ -698,7 +901,7 @@ function ResumeIntelligence({ user }) {
                 <>
                   <div className="ri-dashboard-section-heading">
                     <div><span className="eyebrow">DOCUMENT OVERVIEW</span><h2>Resume content at a glance</h2><p>Counts below are calculated from extracted text—not quality scores or hiring predictions.</p></div>
-                    <TargetRoleSelect value={targetRole} onChange={setTargetRole} />
+                    <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null, "skill-gaps": null })); }} />
                   </div>
                   <div className="ri-score-grid">
                     <MetricCard label="Words extracted" value={analysis.wordCount} note="Tokens found in the uploaded document" />
@@ -753,6 +956,18 @@ function ResumeIntelligence({ user }) {
               </div>
               <article className="ri-card"><h2>Review the source, not just the parser</h2><p>Check the extracted text against the original resume. If a heading or line is missing here, verify the source PDF before changing your resume.</p>{analysis && <details className="ri-extracted-text"><summary>Review extracted resume text</summary><pre>{resumeText}</pre></details>}</article>
               {analysis?.quantifiedClaims.length > 0 && <article className="ri-card"><h2>Evidence review</h2><p>Check the source for every measurable claim. SkillAI has not independently verified these statements.</p>{analysis.quantifiedClaims.map((claim) => <div className="ri-evidence-row" key={claim}><span className="ri-priority medium">User-provided</span><span>{claim}</span><strong>Needs evidence</strong></div>)}</article>}
+              <section className="ri-card ri-ai-resume-card">
+                <div className="ri-section-heading"><div><span className="eyebrow">AI WRITING COACH</span><h2>Get an evidence-based resume review</h2><p>AI reviews clarity and relevance using only the text you provide. It cannot verify claims or predict hiring results.</p></div><button type="button" className="primary-button" onClick={() => void runAI("analyze")} disabled={Boolean(aiLoading) || resumeText.trim().length < 80}>{aiLoading === "analyze" ? "Reviewing…" : "Review with AI"} <Sparkles size={16} /></button></div>
+                <p className="ri-ai-privacy-note"><ShieldCheck size={14} /> Your resume text is sent to the AI provider only after you select “Review with AI”.</p>
+                {aiResults.analyze && <div className="ri-ai-review-result">
+                  <p className="ri-ai-summary">{aiResults.analyze.summary}</p>
+                  <div className="ri-columns">
+                    <article><h3>Strengths in your text</h3>{aiResults.analyze.strengths.map((item, index) => <div className="ri-ai-feedback-item" key={`strength-${index}`}><strong>{item.point}</strong><p>Evidence: “{item.evidence}”</p></div>)}</article>
+                    <article><h3>Ways to improve</h3>{aiResults.analyze.improvements.map((item, index) => <div className="ri-ai-feedback-item" key={`improvement-${index}`}><strong>{item.point}</strong><p>{item.suggestion}</p><small>Based on: “{item.evidence}”</small></div>)}</article>
+                  </div>
+                  <p className="ri-disclaimer">AI suggestions can be wrong. Verify every quotation and recommendation against your original resume before using it.</p>
+                </div>}
+              </section>
             </>
           )}
 
@@ -761,28 +976,105 @@ function ResumeIntelligence({ user }) {
           {route === "optimizer" && (
             <section className="ri-card">
               <h2>Compare resume terms with a job description</h2><p>Paste the job description. This tool reports exact matches for terms in its built-in catalog; it does not calculate an ATS score or judge your suitability.</p>
-              <TargetRoleSelect value={targetRole} onChange={setTargetRole} />
-              <textarea className="ri-textarea" rows={8} value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the full job description here…" />
+              <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null })); }} />
+              <textarea className="ri-textarea" rows={8} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste the full job description here…" />
               {jobDescription && <div className="ri-optimizer-results"><MetricCard label="Catalog terms found in job description" value={jobSkills.length} note="Exact built-in cross-sector skill terms" /><MetricCard label="Those terms also found in resume" value={matchedJobSkills.length} note="Text matches only; not an ATS score" /><InfoRows label="Selected-role terms found in the job description" values={requiredRoleSkills} empty={role ? "No selected-role catalog terms found in the description." : "Choose a target role to check role-specific terms."} /><InfoRows label="Catalog terms in both texts" values={matchedJobSkills} empty="No exact catalog terms found in both texts." /><InfoRows label="Catalog terms in job description but not resume text" values={missingJobSkills} empty="No additional catalog terms detected in the job description." /><InfoRows label="Experience, education, job title, and industry" values={["Not evaluated. Compare these requirements against the original job description and your verified experience."]} empty="" /></div>}
               <Link to="/resume/tailor" className="primary-button">Optimize relevant sections <ArrowRight size={16} /></Link>
             </section>
           )}
 
           {route === "job-match" && (
-            <JobSearch analysis={analysis} />
+            <JobSearch analysis={analysis} resumeText={resumeText} />
           )}
 
           {route === "tailor" && (
             <section className="ri-card">
-              <h2>Tailor only what is relevant</h2><p>Paste a job description to find overlapping and missing terms. Suggestions below only rearrange resume content already present; they do not add skills or experience.</p>
-              <textarea className="ri-textarea" rows={7} value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste a specific job description…" />
-              <div className="ri-before-after"><article><span className="eyebrow">BEFORE · SOURCE TEXT</span><pre>{resumeText || "Upload or create a resume to begin."}</pre></article><article><span className="eyebrow">AFTER · MATCHED CATALOG TERMS</span><pre>{resumeText ? (matchedJobSkills.length ? `Catalog terms found in both the job description and resume text:\n${matchedJobSkills.join("\n")}\n\nNo resume facts have been rewritten. Review and edit relevant original sections in the builder.` : "No matching catalog terms were detected. No changes suggested.") : "Your source resume will appear here after upload."}</pre></article></div>
-              <p className="ri-disclaimer">No experience, skills, metrics, or project results are invented. Review each suggested change yourself.</p><Link to="/resume/builder" className="primary-button">Review in builder <ArrowRight size={16} /></Link>
+              <h2>Tailor only what is relevant</h2><p>Share a job description to get an AI-assisted role-focused draft based only on facts already in your resume. Review every change before using it.</p>
+              <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null })); }} />
+              <textarea className="ri-textarea" rows={7} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste a specific job description…" />
+              <div className="ri-before-after"><article><span className="eyebrow">BEFORE · SOURCE TEXT</span><pre>{resumeText || "Upload or create a resume to begin."}</pre></article><article><span className="eyebrow">KEYWORD CHECK · EXACT TERMS</span><pre>{resumeText ? (matchedJobSkills.length ? `Catalog terms found in both the job description and resume text:\n${matchedJobSkills.join("\n")}\n\nThis exact-term check is separate from the AI-tailored draft below.` : "No matching catalog terms were detected. AI can still review the full description and resume for relevant evidence.") : "Your source resume will appear here after upload."}</pre></article></div>
+              <div className="ri-ai-action-row"><button type="button" className="primary-button" onClick={() => void runAI("tailor", { targetRole, jobDescription })} disabled={Boolean(aiLoading) || resumeText.trim().length < 80 || jobDescription.trim().length < 40}>{aiLoading === "tailor" ? "Creating a tailored draft…" : "Create AI-tailored draft"} <Sparkles size={16} /></button><span className="ri-ai-privacy-note"><ShieldCheck size={14} /> Resume and job description are sent to AI only when you choose this action.</span></div>
+              {aiResults.tailor && <div className="ri-ai-tailor-result">
+                <div className="ri-section-heading"><div><span className="eyebrow">AI-GENERATED DRAFT</span><h3>Review before applying</h3></div><button type="button" className="secondary-button" onClick={applyTailoredDraft}>Use draft and save original version</button></div>
+                <pre>{aiResults.tailor.draft}</pre>
+                <div className="ri-columns"><article><h3>Changes made</h3><ul>{aiResults.tailor.changes.map((item, index) => <li key={`change-${index}`}>{item}</li>)}</ul></article><article><h3>Evidence to review</h3>{aiResults.tailor.reviewNotes.length ? <ul>{aiResults.tailor.reviewNotes.map((item, index) => <li key={`review-${index}`}>{item}</li>)}</ul> : <p>No specific missing-evidence notes returned. Still verify every detail against your original.</p>}</article></div>
+                <p className="ri-disclaimer">AI can still introduce errors. Applying the draft saves your current resume to Resume Versions first; verify all claims before exporting or applying.</p>
+              </div>}
+              <p className="ri-disclaimer">AI may miss or misinterpret information. No experience, skills, metrics, or project results should be used unless you can verify them.</p>
             </section>
           )}
 
           {route === "skill-gaps" && (
-            <section className="ri-card"><TargetRoleSelect value={targetRole} onChange={setTargetRole} />{role ? <><h2>{role.name}: catalog term check</h2><span className="eyebrow">{role.sector}</span><div className="ri-skill-list">{role.skills.map((skill) => { const found = includesTerm(resumeText, skill); return <div className="ri-skill-row" key={skill}><span>{skill}</span><span className={found ? "ri-skill-found" : "ri-skill-gap"}>{found ? "Term found in resume text" : "Term not found in resume text"}</span></div>; })}</div></> : <p>Choose a sector and target role to see exact term matches.</p>}<p className="ri-disclaimer">A missing text match does not mean you lack the skill; the parser may miss content. Verify against your resume and experience.</p><Link to="/roadmap" className="primary-button">Explore my career roadmap <ArrowRight size={16} /></Link></section>
+            <section className="ri-card">
+              <TargetRoleSelect
+                value={targetRole}
+                onChange={(value) => {
+                  setTargetRole(value);
+                  setAiResults((current) => ({ ...current, "skill-gaps": null }));
+                }}
+              />
+              {role ? (
+                <>
+                  <h2>{role.name}: catalog term check</h2>
+                  <span className="eyebrow">{role.sector}</span>
+                  <div className="ri-skill-list">
+                    {role.skills.map((skill) => {
+                      const found = includesTerm(resumeText, skill);
+                      return (
+                        <div className="ri-skill-row" key={skill}>
+                          <span>{skill}</span>
+                          <span className={found ? "ri-skill-found" : "ri-skill-gap"}>
+                            {found ? "Term found in resume text" : "Term not found in resume text"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="primary-button ri-ai-skill-button"
+                    onClick={() => void runAI("skill-gaps", { targetRole: role.name, requiredSkills: role.skills })}
+                    disabled={Boolean(aiLoading) || resumeText.trim().length < 80}
+                  >
+                    {aiLoading === "skill-gaps" ? "Reviewing evidence…" : "Review skills with AI"} <Sparkles size={16} />
+                  </button>
+                  <p className="ri-ai-privacy-note"><ShieldCheck size={14} /> Your resume text is sent to the AI provider only when you request this review.</p>
+                </>
+              ) : <p>Choose a sector and target role to see exact term matches.</p>}
+              {aiResults["skill-gaps"] && (
+                <div className="ri-ai-skill-result">
+                  <h3>AI evidence review</h3>
+                  <p>{aiResults["skill-gaps"].summary}</p>
+                  <div className="ri-columns">
+                    <article>
+                      <h3>Skills with evidence</h3>
+                      {aiResults["skill-gaps"].evidenced.length
+                        ? aiResults["skill-gaps"].evidenced.map((item) => (
+                          <div className="ri-ai-feedback-item" key={`evidence-${item.skill}`}>
+                            <strong>{item.skill}</strong><p>“{item.evidence}”</p>
+                          </div>
+                        ))
+                        : <p>No clear evidence found in the text for the listed skills.</p>}
+                    </article>
+                    <article>
+                      <h3>Not evidenced in this text</h3>
+                      {aiResults["skill-gaps"].gaps.length
+                        ? aiResults["skill-gaps"].gaps.map((item) => (
+                          <div className="ri-ai-feedback-item" key={`gap-${item.skill}`}>
+                            <strong>{item.skill}</strong><p>{item.nextStep}</p>
+                          </div>
+                        ))
+                        : <p>The AI did not identify any additional text gaps in the supplied role catalog.</p>}
+                    </article>
+                  </div>
+                  <h3>Questions to check transferable experience</h3>
+                  <ul>{aiResults["skill-gaps"].questions.map((item, index) => <li key={`question-${index}`}>{item}</li>)}</ul>
+                  <p className="ri-disclaimer">A gap means the resume text didn't clearly evidence a skill; it doesn't mean you lack that skill. Verify the quotations and suggestions.</p>
+                </div>
+              )}
+              <p className="ri-disclaimer">Exact term matches and AI feedback are coaching aids, not hiring predictions. Verify against your resume and experience.</p>
+              <Link to="/roadmap" className="primary-button">Explore my career roadmap <ArrowRight size={16} /></Link>
+            </section>
           )}
 
           {route === "project-analyzer" && (

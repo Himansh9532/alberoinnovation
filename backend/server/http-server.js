@@ -3,11 +3,13 @@ import { handleCreateRazorpayOrder, handleGetPlanUsage, handleVerifyRazorpayPaym
 import { handleGetIndiaJobsRequest } from "./jobs-api.js";
 import { handleGenerateAssessmentRequest, handleGenerateInterviewRequest } from "./interview-api.js";
 import { handleResearchAssistantRequest } from "./research-assistant-api.js";
+import { handleResumeAssistantRequest } from "./resume-assistant-api.js";
 
 const routes = new Map([
   ["/api/generate-interview", handleGenerateInterviewRequest],
   ["/api/skill-assessment", handleGenerateAssessmentRequest],
   ["/api/research-assistant", handleResearchAssistantRequest],
+  ["/api/resume-assistant", handleResumeAssistantRequest],
   ["/api/billing/usage", handleGetPlanUsage],
   ["/api/billing/order", handleCreateRazorpayOrder],
   ["/api/billing/verify-payment", handleVerifyRazorpayPayment],
