@@ -14,25 +14,26 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Facebook,
   FileText,
   FolderKanban,
   GraduationCap,
+  Instagram,
   Layers3,
   LoaderCircle,
   Mail,
   MapPin,
   Menu,
-  Moon,
   Phone,
   Search,
   Send,
   ShieldCheck,
   Sparkles,
-  Sun,
   Target,
   TimerReset,
   TrendingUp,
   UserRound,
+  Youtube,
   X,
 } from "lucide-react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -49,12 +50,19 @@ import { getDashboardActivity } from "./data/dashboardActivity";
 import { apiUrl } from "./data/api";
 import { academicPaths } from "./data/academic-paths";
 import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../shared/plan-pricing.js";
+import { AppShell, Sidebar } from "./components/ui.jsx";
 
 const InterviewExperiencePage = lazy(() => import("./components/InterviewExperience"));
 const SkillAssessmentPage = lazy(() => import("./components/SkillAssessment"));
-const ResumeIntelligence = lazy(() => import("./components/ResumeIntelligence"));
+const loadResumeIntelligence = () => import("./components/ResumeIntelligence");
+const ResumeIntelligence = lazy(loadResumeIntelligence);
+const preloadResumeIntelligence = () => {
+  void loadResumeIntelligence().catch((error) => {
+    console.error("Resume Intelligence could not be preloaded.", error);
+  });
+};
 
-const SEO_SITE_URL = "https://www.alberotechnologies.in";
+const SEO_SITE_URL = "https://alberoinnovation.com";
 const SAVED_RESEARCH_SEARCHES_KEY = "skillai-research-saved-searches";
 const RESEARCH_LIBRARY_KEY = "skillai-research-library";
 const RESEARCH_LIBRARY_LIMIT = 200;
@@ -204,12 +212,48 @@ const resourceCards = [
   { category: "Research", level: "Step-by-step", title: "Find reliable sources and build a strong research question" },
 ];
 
+const workspaceNavigation = [
+  { label: "WORKSPACE", items: [{ label: "Student Dashboard", to: "/dashboard" }] },
+  { label: "RESUME", items: [
+    { label: "Resume Dashboard", to: "/resume/dashboard" },
+    { label: "Resume Analyzer", to: "/resume/analyzer" },
+    { label: "Resume Builder", to: "/resume/builder" },
+  ] },
+  { label: "OPTIMIZATION", items: [
+    { label: "Job Description Match", to: "/resume/optimizer" },
+    { label: "Job Match", to: "/resume/job-match" },
+    { label: "Resume Tailor", to: "/resume/tailor" },
+  ] },
+  { label: "CAREER INTELLIGENCE", items: [
+    { label: "Skill Gap Analysis", to: "/resume/skill-gaps" },
+    { label: "Project Analyzer", to: "/resume/project-analyzer" },
+    { label: "Career Profile", to: "/resume/profile" },
+    { label: "Career Roadmap", to: "/roadmap" },
+  ] },
+  { label: "MANAGEMENT", items: [
+    { label: "Resume Versions", to: "/resume/versions" },
+    { label: "Career Package", to: "/resume/package" },
+  ] },
+  { label: "LEARNING", items: [
+    { label: "AI Interview", to: "/interview" },
+    { label: "Skill Assessment", to: "/assessment" },
+    { label: "Explore Domains", to: "/domains" },
+  ] },
+  { label: "RESEARCH & RESOURCES", items: [
+    { label: "Research Hub", to: "/research" },
+    { label: "Research Maker", to: "/research/maker" },
+    { label: "Resources", to: "/resources" },
+  ] },
+  { label: "SITE", items: [
+    { label: "Home", to: "/" },
+    { label: "Pricing", to: "/pricing" },
+    { label: "Contact us", to: "/contact" },
+  ] },
+];
+
 function Navbar({ user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [theme, setTheme] = useState(() => (
-    window.localStorage.getItem("skillai-theme") === "dark" ? "dark" : "light"
-  ));
   const location = useLocation();
 
   useEffect(() => {
@@ -217,34 +261,17 @@ function Navbar({ user, onLogout }) {
     setOpenDropdown(null);
   }, [location.pathname]);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("skillai-theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
-  const themeLabel = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
-
   return (
     <header className="site-header">
       <div className="wrap header-inner">
-        <Link to="/" className="brand" aria-label="SkillAI home">
-          <span className="brand-mark" aria-hidden="true"><Sparkles size={20} strokeWidth={2.1} /></span>
+        <Link to="/" className="brand" aria-label="Albero Innovation home">
+          <span className="brand-mark" aria-hidden="true">
+            <img src="/albero-innovation-mark.svg" alt="" />
+          </span>
           <span className="brand-text">
-            <strong>SkillAI</strong>
+            <strong>Albero Innovation</strong>
           </span>
         </Link>
-
-        <button
-          type="button"
-          className="icon-button theme-toggle mobile-theme-toggle"
-          onClick={toggleTheme}
-          aria-label={themeLabel}
-          aria-pressed={theme === "dark"}
-          title={themeLabel}
-        >
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
 
         <button
           type="button"
@@ -266,7 +293,12 @@ function Navbar({ user, onLogout }) {
                     className={`nav-dropdown-heading${(item.children || item.groups.flatMap((group) => group.items)).some((child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)) ? " active" : ""}`}
                     aria-expanded={openDropdown === item.label}
                     aria-controls={`${item.label.toLowerCase()}-nav-menu`}
-                    onClick={() => setOpenDropdown((open) => open === item.label ? null : item.label)}
+                    onPointerEnter={item.label === "Resume" ? preloadResumeIntelligence : undefined}
+                    onFocus={item.label === "Resume" ? preloadResumeIntelligence : undefined}
+                    onClick={() => {
+                      if (item.label === "Resume") preloadResumeIntelligence();
+                      setOpenDropdown((open) => open === item.label ? null : item.label);
+                    }}
                   >
                     {item.label}
                     <ChevronDown size={14} aria-hidden="true" />
@@ -276,7 +308,7 @@ function Navbar({ user, onLogout }) {
                   <div id={`${item.label.toLowerCase()}-nav-menu`} className="nav-dropdown-menu nav-mega-menu">
                     {item.groups.map((group) => <section className="nav-mega-group" key={group.heading}>
                       <span>{group.heading}</span>
-                      {group.items.map(({ icon: Icon, ...child }) => <NavLink key={child.to} to={child.to} className="nav-mega-link"><i><Icon size={17} /></i><span><strong>{child.label}</strong><small>{child.description}</small></span><ArrowRight size={14} /></NavLink>)}
+                      {group.items.map(({ icon: Icon, ...child }) => <NavLink key={child.to} to={child.to} onPointerEnter={preloadResumeIntelligence} onFocus={preloadResumeIntelligence} onClick={preloadResumeIntelligence} className="nav-mega-link"><i><Icon size={17} /></i><span><strong>{child.label}</strong><small>{child.description}</small></span><ArrowRight size={14} /></NavLink>)}
                     </section>)}
                   </div>
                 ) : (
@@ -300,16 +332,6 @@ function Navbar({ user, onLogout }) {
           <div className="nav-tools">
             <button type="button" className="icon-button" aria-label="Notifications">
               <Bell size={18} />
-            </button>
-            <button
-              type="button"
-              className="icon-button theme-toggle desktop-theme-toggle"
-              onClick={toggleTheme}
-              aria-label={themeLabel}
-              aria-pressed={theme === "dark"}
-              title={themeLabel}
-            >
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <span className="nav-divider" aria-hidden="true" />
             {user ? (
@@ -337,14 +359,19 @@ function Navbar({ user, onLogout }) {
                   className={`mobile-nav-dropdown-heading${(item.children || item.groups.flatMap((group) => group.items)).some((child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)) ? " active" : ""}`}
                   aria-expanded={openDropdown === item.label}
                   aria-controls={`mobile-${item.label.toLowerCase()}-nav-menu`}
-                  onClick={() => setOpenDropdown((open) => open === item.label ? null : item.label)}
+                  onPointerEnter={item.label === "Resume" ? preloadResumeIntelligence : undefined}
+                  onFocus={item.label === "Resume" ? preloadResumeIntelligence : undefined}
+                  onClick={() => {
+                    if (item.label === "Resume") preloadResumeIntelligence();
+                    setOpenDropdown((open) => open === item.label ? null : item.label);
+                  }}
                 >
                   {item.label}
                   <ChevronDown size={16} aria-hidden="true" />
                 </button>
               </div>
               <div id={`mobile-${item.label.toLowerCase()}-nav-menu`} className={`mobile-nav-submenu${openDropdown === item.label ? " open" : ""}`}>
-                {item.groups ? item.groups.flatMap((group) => group.items).map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}><span>{child.label}<small>{child.description}</small></span></NavLink>) : item.children.map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>{child.label}</NavLink>)}
+                {item.groups ? item.groups.flatMap((group) => group.items).map((child) => <NavLink key={child.to} to={child.to} onPointerEnter={preloadResumeIntelligence} onFocus={preloadResumeIntelligence} onClick={preloadResumeIntelligence} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}><span>{child.label}<small>{child.description}</small></span></NavLink>) : item.children.map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>{child.label}</NavLink>)}
               </div>
             </div>
           ) : (
@@ -391,6 +418,43 @@ function HomePage() {
     { icon: TrendingUp, title: "Career roadmaps", copy: "Connect your current skills with roles and practical steps to explore.", to: "/roadmap", link: "Explore roadmaps" },
   ];
 
+  const companyPartners = [
+    { name: "Microsoft", image: "/images/microsoft-logo.svg" },
+    { name: "Google", image: "/images/google-logo.svg" },
+    { name: "HCL", image: "/images/hcl-logo.svg" },
+    { name: "Infosys", image: "/images/infosys-logo.svg" },
+    { name: "TCS", image: "/images/tcs-logo.svg" },
+    { name: "IBM", image: "/images/ibm-logo.svg" },
+  ];
+
+  const testimonials = [
+    {
+      image: "/interviewers/rohan.jpg",
+      role: "Engineering student",
+      quote: "I used the mock interview prompts to practice structuring my answers before applying for an internship.",
+    },
+    {
+      image: "/interviewers/maya.jpg",
+      role: "Recent graduate",
+      quote: "The assessment feedback helped me choose one skill to focus on instead of trying to learn everything at once.",
+    },
+    {
+      image: "/interviewers/jordan-reference.png",
+      role: "Business student",
+      quote: "I could compare my resume with a role and spot the experience I needed to make clearer.",
+    },
+    {
+      image: "/interviewers/amir.jpg",
+      role: "Research learner",
+      quote: "Finding papers by topic gave me a better starting point for my research outline.",
+    },
+    {
+      image: "/interviewers/alex.jpg",
+      role: "Early-career professional",
+      quote: "The career tools helped me break a bigger goal into a few manageable next steps.",
+    },
+  ];
+
   return (
     <main className="page-shell home-page">
       <section className="hero-section wrap" aria-labelledby="home-title">
@@ -410,12 +474,48 @@ function HomePage() {
 
         <div className="home-visual">
           <img
-            src="/all-fields-career.svg"
-            alt="Illustration of a professional exploring career growth"
+            src="/career-assessment.svg"
+            alt="Illustration of a learner reviewing skills and career progress"
           />
           <div className="home-visual-caption">
-            <span className="home-caption-mark"><Sparkles size={17} /></span>
-            <span><strong>One step at a time</strong><small>Build a path around your goals.</small></span>
+            <span className="home-caption-mark"><Sparkles size={17} aria-hidden="true" /></span>
+            <span><strong>Your next step, made clearer</strong><small>Learn, practice, and grow at your pace.</small></span>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-soft home-partners-section" aria-label="Companies to explore">
+        <div className="wrap">
+          <div className="home-partners-heading">
+            <span className="eyebrow">Explore opportunities at leading companies</span>
+          </div>
+          <div className="company-logo-row" role="list" aria-label="Company logos">
+            {companyPartners.map((company) => (
+              <div key={company.name} className="company-logo-pill" role="listitem">
+                <img src={company.image} alt={company.name} />
+              </div>
+            ))}
+          </div>
+          <div className="home-testimonials" aria-labelledby="home-testimonials-title">
+            <div className="home-testimonials-heading">
+              <span className="eyebrow">Sample testimonials</span>
+              <h2 id="home-testimonials-title">Learner stories, in their own words.</h2>
+              <p>Illustrative sample quotes and profile images — replace them with verified learner feedback before publishing.</p>
+            </div>
+            <div className="testimonial-grid">
+              {testimonials.map((testimonial, index) => (
+                <article key={testimonial.role} className="testimonial-card">
+                  <blockquote>“{testimonial.quote}”</blockquote>
+                  <div className="testimonial-profile">
+                    <img src={testimonial.image} alt="" loading="lazy" />
+                    <div>
+                      <strong>Sample learner {index + 1}</strong>
+                      <small>{testimonial.role}</small>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -1943,7 +2043,7 @@ function ContactPage() {
           <section className="contact-form-card" aria-labelledby="contact-form-title">
             <div className="contact-form-heading">
               <span className="contact-form-mark"><Send size={18} /></span>
-              <div><h2 id="contact-form-title">Send us a message</h2><p>Fill in the details and your email app will open with your message ready.</p></div>
+              <div><h2 id="contact-form-title">Send us a message</h2><p>Share a few details and your email app will open with the message addressed to our team.</p></div>
             </div>
             <form className="contact-form" onSubmit={handleSubmit}>
               <div className="contact-form-row">
@@ -1960,8 +2060,8 @@ function ContactPage() {
                 </select>
               </label>
               <label className="field"><span>Your message</span><textarea className="auth-input contact-message-input" name="message" rows="5" placeholder="Tell us how we can help..." required /></label>
-              <button type="submit" className="primary-button contact-submit">Open email app <ArrowRight size={17} /></button>
-              <p className="contact-form-note">Your message isn't sent automatically. Review it in your email app and press Send.</p>
+              <button type="submit" className="primary-button contact-submit">Continue to email <ArrowRight size={17} /></button>
+              <p className="contact-form-note">Your message is not sent from this page. Review it in your email app and press Send.</p>
             </form>
           </section>
         </div>
@@ -2564,8 +2664,10 @@ function Footer() {
       <div className="wrap footer-inner">
         <div className="footer-brand-block">
           <div className="brand mini-brand">
-            <span className="brand-mark" aria-hidden="true"><Sparkles size={20} strokeWidth={2.1} /></span>
-            <span className="brand-text"><strong>SkillAI</strong><small>Assess. Improve. Grow.</small></span>
+            <span className="brand-mark" aria-hidden="true">
+              <img src="/albero-innovation-mark.svg" alt="" />
+            </span>
+            <span className="brand-text"><strong>Albero Innovation</strong></span>
           </div>
           <p>AI-powered interview readiness, skill intelligence, and career growth support for students, researchers, and professionals.</p>
         </div>
@@ -2593,11 +2695,21 @@ function Footer() {
         </div>
       </div>
 
+      <div className="wrap footer-social-row">
+        <span>Follow Albero</span>
+        <nav className="footer-social-links" aria-label="Albero social media">
+          <a href="https://www.instagram.com/albero.technologies/" target="_blank" rel="noopener noreferrer" aria-label="Albero on Instagram" title="Instagram"><Instagram size={19} /></a>
+          <a href="https://www.facebook.com/AlberoTechnologies1" target="_blank" rel="noopener noreferrer" aria-label="Albero on Facebook" title="Facebook"><Facebook size={19} /></a>
+          <button type="button" disabled aria-label="YouTube link will be added later" title="YouTube link will be added later"><Youtube size={19} /></button>
+        </nav>
+      </div>
+
       <div className="wrap footer-bottom">
-        <span>© 2026 SkillAI</span>
+        <span>© 2026 · All rights reserved · Albero Technologies</span>
         <span>Privacy</span>
         <span>Terms</span>
         <Link to="/contact">Contact us</Link>
+        <span className="footer-credit">Website by <a href="https://www.albero.in/" target="_blank" rel="noopener noreferrer">Albero</a></span>
       </div>
     </footer>
   );
@@ -2605,6 +2717,11 @@ function Footer() {
 
 function App() {
   const location = useLocation();
+  useEffect(() => {
+    document.documentElement.removeAttribute("data-theme");
+    window.localStorage.removeItem("skillai-theme");
+  }, []);
+
   const [session, setSession] = useState(() => {
     try {
       const storedSession = window.localStorage.getItem('skillai-auth');
@@ -2707,7 +2824,7 @@ function App() {
     ? location.state.from
     : "/dashboard";
   const resumePage = (
-    <Suspense fallback={<main className="page-shell ri-page"><div className="wrap">Loading Resume Intelligence…</div></main>}>
+    <Suspense fallback={<main className="page-shell ri-page"><div className="wrap ri-route-loading" role="status" aria-live="polite"><LoaderCircle size={20} aria-hidden="true" /> Opening your resume workspace…</div></main>}>
       <ResumeIntelligence key={session?.id} user={session} />
     </Suspense>
   );
@@ -2720,7 +2837,7 @@ function App() {
   );
   const requireSession = (element) => session ? element : loginRequired;
 
-  return (
+  const page = (
     <>
       <Navbar user={session} onLogout={handleLogout} />
       <main className="page-main">
@@ -2747,6 +2864,14 @@ function App() {
       </main>
       <Footer />
     </>
+  );
+
+  return session ? (
+    <AppShell sidebar={<Sidebar user={session} groups={workspaceNavigation} footer="Your resume stays here unless you choose to share it." />}>
+      {page}
+    </AppShell>
+  ) : (
+    page
   );
 }
 

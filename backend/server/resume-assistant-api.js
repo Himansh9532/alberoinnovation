@@ -116,7 +116,7 @@ function createPrompt(payload) {
       "<resume>",
       payload.resumeText.trim(),
       "</resume>",
-      "Return a complete, readable role-focused resume draft using only facts, skills, dates, employers, education, projects, and metrics explicitly present in the source resume. Reorder or clarify existing information, but never fabricate, infer, or upgrade claims. Preserve contact details as supplied. If the source lacks evidence for a job requirement, do not add it; list the requirement in reviewNotes. Return no markdown fences.",
+      "Return a complete, professionally written, ATS-readable resume using standard section headings and concise bullet points. Prioritize and reorder the source experience, projects, and skills most relevant to the target role; improve grammar and clarity without keyword stuffing. Use only facts, skills, dates, employers, education, projects, and metrics explicitly present in the source resume. Never fabricate, infer, or upgrade claims, and preserve contact details as supplied. If the source lacks evidence for a job requirement, do not add it; list the requirement in reviewNotes. Return no markdown fences.",
     ].join("\n");
   }
   if (payload.action === "skill-gaps") {
