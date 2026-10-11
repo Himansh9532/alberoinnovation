@@ -10,16 +10,16 @@ npm install
 
 Copy `.env.example` to `.env.local` and set the Firebase web app values. Copy `.env.development.example` to `.env.development.local`. Copy `backend/.env.example` to `backend/.env` and set the backend credentials.
 
-Start the API backend and frontend together:
-
-```sh
-npm run dev
-```
-
-Vite is available by itself with `npm run dev:web`. To run the API separately, use:
+In the first terminal, start the separate API backend:
 
 ```sh
 npm run start:api:local
+```
+
+In a second terminal, start the static frontend:
+
+```sh
+npm run dev
 ```
 
 ## AI interview question generation

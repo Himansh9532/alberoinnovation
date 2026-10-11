@@ -8,25 +8,18 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
-  FileCheck2,
   FileText,
-  FileUp,
   FolderKanban,
-  Github,
   GraduationCap,
-  Linkedin,
   Lightbulb,
-  Layers3,
   ListChecks,
-  Mail,
-  Phone,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
   Target,
-  Trash2,
   UserRound,
+  UploadCloud,
 } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { getFirebaseIdToken } from "../data/firebaseAuth";
@@ -79,10 +72,10 @@ const SKILL_CATALOG = [...new Set(ROLES.flatMap((role) => role.skills))];
 const SECTORS = [...new Set(ROLES.map((role) => role.sector))];
 const SECTIONS = ["Summary", "Experience", "Education", "Projects", "Skills", "Certifications", "Achievements", "Publications", "Internships", "Training", "Languages"];
 const SECTION_HEADINGS = {
-  summary: ["summary", "professional summary", "career summary", "profile", "profile summary", "objective", "about"],
-  experience: ["experience", "work experience", "professional experience", "employment", "employment history", "work history"],
-  education: ["education", "academic", "academic background"],
-  projects: ["projects", "project", "personal projects"],
+  summary: ["summary", "profile", "objective", "about"],
+  experience: ["experience", "employment", "work history"],
+  education: ["education", "academic"],
+  projects: ["projects", "project"],
   skills: ["skills", "technical skills", "competencies"],
   certifications: ["certifications", "certificates"],
   achievements: ["achievements", "awards", "honors"],
@@ -107,49 +100,6 @@ function sectionExists(text, section) {
   return headings.some((heading) => new RegExp(`(^|\\n)\\s*${heading}\\s*:?\\s*(\\n|$)`, "im").test(text));
 }
 
-function addMissingSkillsToResumeDraft(draft, skills) {
-  const missingSkills = [...new Set(skills)].filter((skill) => !includesTerm(draft, skill));
-  if (!missingSkills.length) return { draft, addedSkills: [] };
-
-  const normalizeHeading = (line) => line
-    .trim()
-    .replace(/^#+\s*/, "")
-    .replace(/^\*\*(.*)\*\*$/, "$1")
-    .replace(/[*_`]/g, "")
-    .replace(/[:：]\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-  const skillsHeadings = new Set(SECTION_HEADINGS.skills.map(normalizeHeading));
-  const allSectionHeadings = new Set(Object.values(SECTION_HEADINGS).flat().map(normalizeHeading));
-  const lines = draft.split(/\r?\n/);
-  const skillsIndex = lines.findIndex((line) => skillsHeadings.has(normalizeHeading(line)));
-  const additions = [];
-  for (let index = 0; index < missingSkills.length; index += 5) {
-    additions.push(`• ${missingSkills.slice(index, index + 5).join(" · ")}`);
-  }
-
-  if (skillsIndex >= 0) {
-    let insertAt = lines.length;
-    for (let index = skillsIndex + 1; index < lines.length; index += 1) {
-      if (allSectionHeadings.has(normalizeHeading(lines[index]))) {
-        insertAt = index;
-        break;
-      }
-    }
-    lines.splice(insertAt, 0, ...additions);
-  } else {
-    let insertAt = lines.findIndex((line) => allSectionHeadings.has(normalizeHeading(line)));
-    if (insertAt < 0) insertAt = lines.length;
-    const skillSection = ["Skills", ...additions];
-    if (insertAt > 0 && lines[insertAt - 1]?.trim()) skillSection.unshift("");
-    if (insertAt < lines.length && lines[insertAt]?.trim()) skillSection.push("");
-    lines.splice(insertAt, 0, ...skillSection);
-  }
-
-  return { draft: lines.join("\n").trim(), addedSkills: missingSkills };
-}
-
 function scanResume(text) {
   if (!text.trim()) return null;
   const sections = Object.keys(SECTION_HEADINGS);
@@ -159,44 +109,6 @@ function scanResume(text) {
     .map((match) => match[0].trim());
   const bullets = text.split(/\r?\n/).filter((line) => /^\s*[•*-]\s+/.test(line));
   const actionBullets = bullets.filter((line) => /^\s*[•*-]\s+(?:built|created|developed|led|managed|improved|designed|analyzed|implemented|delivered|reduced|increased|launched)\b/i.test(line));
-  const hasEmail = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text);
-  const hasPhone = text.split(/\r?\n/).some((line) => {
-    const digits = line.replace(/\D/g, "");
-    return digits.length >= 10 && digits.length <= 15 && /(?:\+?\d[\d\s().-]{8,}\d)/.test(line);
-  });
-  const scoreFactors = [
-    {
-      label: "Standard section headings",
-      score: Math.round((presentSections.length / sections.length) * 30),
-      max: 30,
-      detail: `${presentSections.length} of ${sections.length} detected`,
-    },
-    {
-      label: "Contact details",
-      score: (hasEmail ? 10 : 0) + (hasPhone ? 10 : 0),
-      max: 20,
-      detail: `${hasEmail ? "Email found" : "Email not found"} · ${hasPhone ? "Phone found" : "Phone not found"}`,
-    },
-    {
-      label: "Recognized skill terms",
-      score: Math.round((Math.min(foundSkills.length, 8) / 8) * 20),
-      max: 20,
-      detail: `${foundSkills.length} catalog terms · up to 8 count`,
-    },
-    {
-      label: "Bullet structure",
-      score: bullets.length ? 5 + Math.round((actionBullets.length / bullets.length) * 10) : 0,
-      max: 15,
-      detail: `${actionBullets.length} of ${bullets.length} start with a listed action verb`,
-    },
-    {
-      label: "Measurable-result phrases",
-      score: Math.min(quantifiedClaims.length, 3) * 5,
-      max: 15,
-      detail: `${quantifiedClaims.length} outcome-and-number patterns found · up to 3 count`,
-    },
-  ];
-  const atsReadinessScore = scoreFactors.reduce((total, factor) => total + factor.score, 0);
   return {
     foundSkills,
     presentSections,
@@ -204,11 +116,6 @@ function scanResume(text) {
     quantifiedClaims,
     bullets,
     actionBullets,
-    atsReadiness: {
-      score: atsReadinessScore,
-      factors: scoreFactors,
-      label: atsReadinessScore >= 80 ? "Strong signals" : atsReadinessScore >= 60 ? "Good signals" : atsReadinessScore >= 40 ? "Developing" : "Needs attention",
-    },
     wordCount: text.trim().split(/\s+/).length,
   };
 }
@@ -216,156 +123,6 @@ function scanResume(text) {
 function includesTerm(text, term) {
   const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(text);
-}
-
-const MATCH_STOP_WORDS = new Set([
-  "able", "about", "across", "all", "also", "and", "are", "as", "at", "based", "be", "because",
-  "best", "by", "can", "candidate", "company", "day", "degree", "develop", "do", "each", "either",
-  "excellent", "for", "from", "good", "have", "help", "in", "include", "including", "industry",
-  "into", "is", "it", "job", "join", "knowledge", "least", "looking", "must", "new", "of", "on",
-  "or", "our", "per", "position", "preferred", "provide", "related", "role", "skill", "strong",
-  "such", "team", "the", "their", "this", "to", "ability", "using", "various", "we", "what",
-  "which", "will", "with", "work", "you", "your",
-]);
-const MATCH_TOKEN_ALIASES = {
-  ai: "artificial", "c#": "csharp", "c++": "cplusplus", js: "javascript", jses: "javascript",
-  nodejs: "node", "node.js": "node", reactjs: "react", "react.js": "react", ts: "typescript",
-  "typescript.js": "typescript", ux: "userexperience", ui: "userinterface", ml: "machinelearning",
-  aws: "amazonwebservices", gcp: "googlecloud", postgres: "postgresql", mongo: "mongodb",
-};
-
-function normalizeMatchToken(token) {
-  const cleaned = token.toLowerCase().replace(/[^a-z0-9+#]/g, "");
-  const alias = MATCH_TOKEN_ALIASES[cleaned] || cleaned;
-  if (alias.length > 5 && alias.endsWith("ing")) return alias.slice(0, -3);
-  if (alias.length > 4 && alias.endsWith("ed")) return alias.slice(0, -2);
-  if (alias.length > 4 && alias.endsWith("s")) return alias.slice(0, -1);
-  return alias;
-}
-
-function extractMatchKeywords(text, excludedSkills = []) {
-  const normalizedText = text.toLowerCase();
-  const excluded = new Set(excludedSkills.flatMap((skill) => skill.toLowerCase().split(/[^a-z0-9+#]+/).filter(Boolean)));
-  const frequencies = new Map();
-  for (const token of normalizedText.match(/[a-z][a-z0-9+#.-]{2,}/g) || []) {
-    const normalized = normalizeMatchToken(token);
-    if (!normalized || MATCH_STOP_WORDS.has(normalized) || excluded.has(token.replace(/[^a-z0-9+#]/g, ""))) continue;
-    frequencies.set(normalized, (frequencies.get(normalized) || 0) + 1);
-  }
-  return [...frequencies.entries()]
-    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
-    .slice(0, 24)
-    .map(([token]) => token);
-}
-
-function buildJobMatchReport(resumeText, jobDescription, role) {
-  if (resumeText.trim().length < 80 || jobDescription.trim().length < 40 || !role) return null;
-
-  const jdSkills = SKILL_CATALOG.filter((skill) => includesTerm(jobDescription, skill));
-  const roleSkills = role.skills;
-  const roleSkillsInJd = roleSkills.filter((skill) => includesTerm(jobDescription, skill));
-  const requirements = jdSkills.length ? jdSkills : roleSkills;
-  const requirementsSource = jdSkills.length
-    ? "Catalog skill terms found in the job description"
-    : `Selected-role catalog skills for ${role.name}; no catalog skill terms were detected in the job description`;
-  const matchedRequirements = requirements.filter((skill) => includesTerm(resumeText, skill));
-  const missingRequirements = requirements.filter((skill) => !includesTerm(resumeText, skill));
-  const matchedRoleSkills = roleSkills.filter((skill) => includesTerm(resumeText, skill));
-  const missingRoleSkills = roleSkills.filter((skill) => !includesTerm(resumeText, skill));
-  const jdKeywords = extractMatchKeywords(jobDescription, jdSkills);
-  const resumeKeywords = new Set(extractMatchKeywords(resumeText, SKILL_CATALOG));
-  const matchedKeywords = jdKeywords.filter((keyword) => resumeKeywords.has(keyword));
-  const missingKeywords = jdKeywords.filter((keyword) => !resumeKeywords.has(keyword));
-  const evidenceSections = ["summary", "experience", "skills", "projects"];
-  const presentEvidence = evidenceSections.filter((section) => sectionExists(resumeText, section));
-  const ratio = (numerator, denominator) => denominator ? numerator / denominator : 0;
-  const factors = [
-    {
-      label: "JD requirements",
-      weight: 45,
-      score: ratio(matchedRequirements.length, requirements.length) * 10,
-      detail: `${matchedRequirements.length} of ${requirements.length} role-relevant listed skills found`,
-    },
-    {
-      label: "Target-role skills",
-      weight: 25,
-      score: ratio(matchedRoleSkills.length, roleSkills.length) * 10,
-      detail: `${matchedRoleSkills.length} of ${roleSkills.length} catalog skills for ${role.name} found`,
-    },
-    {
-      label: "JD keyword overlap",
-      weight: 20,
-      score: ratio(matchedKeywords.length, jdKeywords.length) * 10,
-      detail: `${matchedKeywords.length} of ${jdKeywords.length} frequent JD terms also appear in the resume`,
-    },
-    {
-      label: "Evidence sections",
-      weight: 10,
-      score: ratio(presentEvidence.length, evidenceSections.length) * 10,
-      detail: `${presentEvidence.length} of ${evidenceSections.length} relevant section headings detected`,
-    },
-  ];
-  const score = Math.round(factors.reduce((total, factor) => total + factor.score * factor.weight / 100, 0) * 10) / 10;
-  const quantifiedClaims = [...resumeText.matchAll(/\b(?:increased|improved|reduced|managed|served|supported|achieved|delivered|grew)\b[^.\n]{0,100}\b\d+(?:\.\d+)?%?/gi)];
-  const recommendations = [];
-
-  if (missingRequirements.length) {
-    recommendations.push({
-      title: "Address the missing job requirements",
-      detail: `The resume does not mention ${missingRequirements.slice(0, 4).join(", ")}${missingRequirements.length > 4 ? ` and ${missingRequirements.length - 4} more` : ""}. If you have this experience, add a truthful example in Skills, Projects, or Experience.`,
-      priority: "High",
-    });
-  } else {
-    recommendations.push({
-      title: "Make your relevant skills easier to verify",
-      detail: "The listed role skills appear in your text. Add a concise project or work example showing where you used them.",
-      priority: "Good next step",
-    });
-  }
-  const missingEvidence = evidenceSections.filter((section) => !presentEvidence.includes(section));
-  if (missingEvidence.length) {
-    recommendations.push({
-      title: "Add clear evidence sections",
-      detail: `Detected headings are missing for ${missingEvidence.join(", ")}. Add the section only when you have relevant details to support it.`,
-      priority: "Improve clarity",
-    });
-  }
-  if (missingKeywords.length) {
-    recommendations.push({
-      title: "Use the employer's language where it matches your experience",
-      detail: `These frequent terms were not found: ${missingKeywords.slice(0, 5).join(", ")}. Reuse them only where they accurately describe your work.`,
-      priority: "Improve relevance",
-    });
-  }
-  if (!quantifiedClaims.length) {
-    recommendations.push({
-      title: "Show outcomes when you can substantiate them",
-      detail: "Your resume text has no detected action-and-number result patterns. Add verified scope, time, quality, or impact measures if available; do not invent metrics.",
-      priority: "Evidence",
-    });
-  }
-
-  return {
-    score,
-    scoreLabel: score >= 8 ? "Strong text alignment" : score >= 6 ? "Good starting alignment" : score >= 4 ? "Some alignment to build on" : "Several gaps to review",
-    requirements,
-    matchedRequirements,
-    missingRequirements,
-    matchedRoleSkills,
-    missingRoleSkills,
-    matchedKeywords,
-    missingKeywords,
-    factors: factors.map((factor) => ({
-      ...factor,
-      score: Math.round(factor.score * 10) / 10,
-      weightedPoints: Math.round(factor.score * factor.weight / 100 * 10) / 10,
-    })),
-    requirementsSource,
-    roleSkillsInJd,
-    jdKeywordCount: jdKeywords.length,
-    presentEvidence,
-    recommendations,
-  };
 }
 
 function extractExperienceValues(text) {
@@ -500,23 +257,15 @@ async function fetchFeedJson(url, source, signal) {
 
 async function requestResumeAI(payload) {
   const token = await getFirebaseIdToken();
-  let response;
-  try {
-    response = await fetch(apiUrl("/api/resume-assistant"), {
-      method: "POST",
-      headers: {
+  const response = await fetch(apiUrl("/api/resume-assistant"), {
+    method: "POST",
+    headers: {
       Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error("Resume AI service is unreachable. Restart the app with “npm run dev” to start the frontend and API together.");
-    }
-    throw error;
-  }
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
   let result;
   try {
     result = await response.json();
@@ -650,212 +399,15 @@ function resumeTextToParagraphs(text) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
-function normalizeResumeHeading(line) {
-  return line
-    .trim()
-    .replace(/^#+\s*/, "")
-    .replace(/^\*\*(.*)\*\*$/, "$1")
-    .replace(/[*_`]/g, "")
-    .replace(/[:：]\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function escapeHtml(text) {
-  return text.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;",
-  })[character]);
-}
-
-function normalizeHexColor(color, fallback = "#29483E") {
-  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
-}
-
-function buildPrintableResume(title, text, headingColor) {
-  const safeHeadingColor = normalizeHexColor(headingColor);
-  const darkHeadingColor = safeHeadingColor;
-  const headingNames = new Set(
-    [...SECTIONS, ...Object.values(SECTION_HEADINGS).flat(), "JD Keywords to Review", "JD Skills to Verify"]
-      .map(normalizeResumeHeading),
-  );
-  const content = [];
-  let bullets = [];
-  const flushBullets = () => {
-    if (!bullets.length) return;
-    content.push(`<ul>${bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
-    bullets = [];
-  };
-
-  resumeTextToParagraphs(text).forEach((line, index) => {
-    const heading = normalizeResumeHeading(line);
-    const bullet = line.match(/^[•*-]\s+(.+)$/);
-    if (index === 0) {
-      flushBullets();
-      content.push(`<h1>${escapeHtml(line)}</h1>`);
-    } else if (headingNames.has(heading)) {
-      flushBullets();
-      content.push(`<h2>${escapeHtml(line.replace(/^#+\s*/, "").replace(/[*_`]/g, "").replace(/[:：]\s*$/, ""))}</h2>`);
-    } else if (bullet) {
-      bullets.push(bullet[1]);
-    } else {
-      flushBullets();
-      content.push(`<p>${escapeHtml(line)}</p>`);
-    }
-  });
-  flushBullets();
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    @page { size: A4; margin: 16mm 17mm; }
-    * { box-sizing: border-box; }
-    body { margin: 0; color: #24332f; font: 10.5pt/1.5 Arial, Helvetica, sans-serif; overflow-wrap: anywhere; }
-    h1 { margin: 0 0 9pt; padding: 0 0 7pt; border-bottom: 2pt solid ${safeHeadingColor}; color: ${darkHeadingColor}; font-size: 22pt; line-height: 1.2; }
-    h2 { margin: 15pt 0 6pt; padding-bottom: 3pt; border-bottom: .75pt solid ${safeHeadingColor}66; color: ${safeHeadingColor}; font-size: 12pt; line-height: 1.25; page-break-after: avoid; break-after: avoid; }
-    p { margin: 0 0 5pt; }
-    ul { margin: 0 0 7pt; padding-left: 19pt; }
-    li { margin: 0 0 3pt; padding-left: 2pt; }
-    @media screen { body { max-width: 210mm; margin: 20px auto; padding: 16mm 17mm; box-shadow: 0 2px 18px #0002; } }
-  </style>
-</head>
-<body>${content.join("\n")}
-<script>window.addEventListener("load", () => window.setTimeout(() => window.print(), 250));</script>
-</body>
-</html>`;
-}
-
-async function downloadDocx(title, text, template, sectionNames, accentColor) {
-  const { BorderStyle, Document, HeadingLevel, Packer, Paragraph, ShadingType, TabStopType, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
-  const templateLayouts = {
-    classic: { alignment: "left", font: "Arial", titleSize: 34, headingSize: 24, gap: 140, leftMargin: 900 },
-    modern: { alignment: "left", font: "Arial", titleSize: 38, headingSize: 25, gap: 150, leftMargin: 900 },
-    compact: { alignment: "left", font: "Arial", titleSize: 30, headingSize: 22, gap: 70, leftMargin: 720 },
-    executive: { alignment: "center", font: "Arial", titleSize: 40, headingSize: 25, gap: 160, leftMargin: 1080 },
-    sidebar: { alignment: "left", font: "Arial", titleSize: 34, headingSize: 24, gap: 120, leftMargin: 1080 },
-    minimal: { alignment: "left", font: "Arial", titleSize: 32, headingSize: 22, gap: 180, leftMargin: 900 },
-    bold: { alignment: "left", font: "Arial", titleSize: 42, headingSize: 27, gap: 150, leftMargin: 900 },
-    elegant: { alignment: "center", font: "Georgia", titleSize: 38, headingSize: 24, gap: 170, leftMargin: 1080 },
-    technical: { alignment: "left", font: "Arial", titleSize: 32, headingSize: 23, gap: 100, leftMargin: 900 },
-    clean: { alignment: "left", font: "Arial", titleSize: 36, headingSize: 24, gap: 130, leftMargin: 900 },
-    split: { alignment: "left", font: "Arial", titleSize: 36, headingSize: 24, gap: 120, leftMargin: 720 },
-    timeline: { alignment: "left", font: "Arial", titleSize: 36, headingSize: 24, gap: 125, leftMargin: 900 },
-    banner: { alignment: "left", font: "Arial", titleSize: 40, headingSize: 25, gap: 140, leftMargin: 900 },
-    editorial: { alignment: "left", font: "Georgia", titleSize: 42, headingSize: 24, gap: 180, leftMargin: 1080 },
-    infographic: { alignment: "left", font: "Arial", titleSize: 36, headingSize: 24, gap: 115, leftMargin: 900 },
-    monochrome: { alignment: "left", font: "Arial", titleSize: 38, headingSize: 25, gap: 140, leftMargin: 900 },
-    framed: { alignment: "left", font: "Georgia", titleSize: 38, headingSize: 24, gap: 150, leftMargin: 1080 },
-    topline: { alignment: "left", font: "Arial", titleSize: 38, headingSize: 24, gap: 135, leftMargin: 900 },
-    portfolio: { alignment: "left", font: "Arial", titleSize: 36, headingSize: 24, gap: 120, leftMargin: 720 },
-    stacked: { alignment: "center", font: "Arial", titleSize: 38, headingSize: 24, gap: 130, leftMargin: 900 },
-  };
-  const layout = templateLayouts[template] || templateLayouts.classic;
-  const headingColor = normalizeHexColor(accentColor).slice(1).toUpperCase();
-  const sectionHeadings = new Set(
-    [
-      ...sectionNames,
-      ...Object.values(SECTION_HEADINGS).flat(),
-      "JD Keywords to Review",
-      "JD Skills to Verify",
-    ].map(normalizeResumeHeading),
-  );
-  const lines = resumeTextToParagraphs(text);
-  const sectionStart = lines.findIndex((line) => sectionHeadings.has(normalizeResumeHeading(line)));
-  const headerLines = lines.slice(0, sectionStart < 0 ? 3 : sectionStart);
-  const contentLines = sectionStart < 0 ? [] : lines.slice(sectionStart);
-  const sections = [];
-  let currentSection = null;
-  contentLines.forEach((line) => {
-    if (sectionHeadings.has(normalizeResumeHeading(line))) {
-      currentSection = { title: line, lines: [] };
-      sections.push(currentSection);
-    } else if (currentSection) {
-      currentSection.lines.push(line);
-    } else {
-      headerLines.push(line);
-    }
-  });
-  const makeParagraph = (line, { isName = false, isSection = false, inSidebar = false } = {}) => {
-    const isClassic = template === "classic";
-    const bulletMatch = line.match(/^\s*[•*-]\s+/);
-    const paragraphText = bulletMatch ? line.slice(bulletMatch[0].length) : line;
-    const titleColor = headingColor;
-    const sectionBorder = template === "clean"
-      ? { bottom: { color: "D9E2D2", size: 4, space: 4, style: BorderStyle.SINGLE } }
-      : ["sidebar", "timeline"].includes(template)
-        ? { left: { color: accentColor.slice(1).toUpperCase(), size: 12, space: 5, style: BorderStyle.SINGLE } }
-        : ["modern", "topline"].includes(template)
-          ? { bottom: { color: accentColor.slice(1).toUpperCase(), size: 8, space: 5, style: BorderStyle.SINGLE } }
-          : undefined;
-    const frameBorder = { top: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, bottom: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, left: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, right: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE } };
-    const [leftText, rightText] = paragraphText.split("\t");
-    return new Paragraph({
-      heading: isName ? HeadingLevel.TITLE : isSection ? HeadingLevel.HEADING_1 : undefined,
-      bullet: bulletMatch && !isName && !isSection ? { level: 0 } : undefined,
-      alignment: ["executive", "elegant", "stacked"].includes(template) && !isSection ? "center" : undefined,
-      tabStops: rightText ? [{ type: TabStopType.RIGHT, position: ["sidebar", "split", "portfolio"].includes(template) ? 6200 : 9000 }] : undefined,
-      indent: bulletMatch ? { left: 360, hanging: 180 } : inSidebar && template === "sidebar" ? { left: 120 } : undefined,
-      border: isSection ? sectionBorder : template === "framed" ? frameBorder : isName && template === "topline" ? { top: { color: accentColor.slice(1).toUpperCase(), size: 18, space: 8, style: BorderStyle.SINGLE } } : undefined,
-      shading: isName && isClassic ? { type: ShadingType.CLEAR, fill: "35434A" } : isName && template === "banner" ? { type: ShadingType.CLEAR, fill: accentColor.slice(1).toUpperCase() } : isSection && template === "infographic" ? { type: ShadingType.CLEAR, fill: "EEF3F7" } : undefined,
-      children: [new TextRun({
-        text: rightText ? leftText : paragraphText,
-        bold: isName || isSection,
-        color: isName && (isClassic || template === "banner") ? "FFFFFF" : isName && template === "monochrome" ? "111111" : isName || isSection ? titleColor : "1B2A22",
-        font: layout.font,
-        size: isName ? Math.max(layout.titleSize, 40) : isSection ? Math.max(layout.headingSize, 26) : 24,
-      }), ...(rightText ? [new TextRun({ text: `\t${rightText}`, font: layout.font, size: 22 })] : [])],
-      keepNext: isSection,
-      keepLines: true,
-      spacing: { before: isSection ? 180 : 0, after: isSection ? 100 : layout.gap },
-    });
-  };
-  const isSidebarSection = (section) => template === "portfolio"
-    ? /^(projects?|certifications?)$/i.test(section.title)
-    : /^(skills|education|certifications?|languages?|training)$/i.test(section.title);
-  const makeSectionParagraphs = (section, inSidebar = false) => [
-    makeParagraph(section.title, { isSection: true, inSidebar }),
-    ...section.lines.map((line) => makeParagraph(line, { inSidebar })),
-  ];
-  const children = headerLines.map((line, index) => makeParagraph(line, { isName: index === 0 }));
-  if (["sidebar", "split", "portfolio"].includes(template) && sections.length) {
-    const sidebarSections = sections.filter(isSidebarSection);
-    const mainSections = sections.filter((section) => !isSidebarSection(section));
-    const noBorders = Object.fromEntries(["top", "bottom", "left", "right", "insideHorizontal", "insideVertical"].map((side) => [
-      side,
-      { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    ]));
-    const cellChildren = (items, inSidebar) => items.length
-      ? items.flatMap((section) => makeSectionParagraphs(section, inSidebar))
-      : [new Paragraph({ children: [] })];
-    children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      columnWidths: [2600, 6800],
-      rows: [new TableRow({ children: [
-        new TableCell({
-          width: { size: 2600, type: WidthType.DXA },
-          shading: { type: ShadingType.CLEAR, fill: template === "portfolio" ? "F2EBE5" : template === "split" ? "EEF3F7" : "E8EDEF" },
-          children: cellChildren(sidebarSections, true),
-        }),
-        new TableCell({
-          width: { size: 6800, type: WidthType.DXA },
-          children: cellChildren(mainSections, false),
-        }),
-      ] })],
-      borders: noBorders,
-    }));
-  } else {
-    sections.forEach((section) => children.push(...makeSectionParagraphs(section)));
-  }
+async function downloadDocx(title, text) {
+  const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
+  const paragraphs = resumeTextToParagraphs(text).map((line, index) => new Paragraph({
+    heading: index === 0 ? HeadingLevel.TITLE : undefined,
+    children: [new TextRun({ text: line, bold: index === 0 })],
+    spacing: { after: 140 },
+  }));
   const document = new Document({
-    sections: [{ properties: { page: { margin: { top: 720, right: layout.leftMargin, bottom: 720, left: layout.leftMargin } } }, children }],
+    sections: [{ properties: {}, children: paragraphs }],
     title,
   });
   saveBlob(await Packer.toBlob(document), `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.docx`);
@@ -871,7 +423,7 @@ function MetricCard({ label, value, note }) {
   );
 }
 
-function ResumeUpload({ onRead, status, busy, error, compact = false, hasResume = false }) {
+function ResumeUpload({ onRead, status, busy, error, compact = false }) {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFile = async (file) => {
@@ -904,22 +456,19 @@ function ResumeUpload({ onRead, status, busy, error, compact = false, hasResume 
       <input
         type="file"
         accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-        aria-label={compact ? hasResume ? "Replace resume" : "Upload resume" : "Choose a resume file"}
+        aria-label={compact ? "Upload or replace resume" : "Choose a resume file"}
         disabled={busy}
         onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; void handleFile(file); }}
       />
-      {compact
-        ? <span className="ri-upload-compact-icon"><FileUp size={18} strokeWidth={1.8} aria-hidden="true" /></span>
-        : <span className="ri-upload-icon"><FileUp size={27} strokeWidth={1.7} aria-hidden="true" /></span>}
+      {!compact && <span className="ri-upload-icon"><UploadCloud size={22} /></span>}
       <span className="ri-upload-content">
         <strong>
           {busy ? "Reading your resume…" : compact
-            ? hasResume ? "Replace resume" : "Upload resume"
+            ? "Upload or replace resume"
             : isDragging
               ? "Drop to upload your resume"
               : "Drop your resume here"}
         </strong>
-        {compact && <span className="ri-upload-compact-hint">{busy ? "Please wait while your file is processed" : "PDF, DOC, DOCX or TXT"}</span>}
         {!compact && <span className="ri-upload-browse">{busy ? "Please wait…" : "Browse files"}</span>}
         {!compact && <small>PDF, DOC, DOCX, or TXT · up to 10 MB</small>}
         {status && <span className="ri-upload-status" role="status">{status}</span>}
@@ -1149,14 +698,13 @@ function ResumeIntelligence({ user }) {
   const profileStorageKey = storageKey(PROFILE_KEY);
   const resumeStorageKey = storageKey(RESUME_KEY);
   const versionsStorageKey = storageKey(VERSIONS_KEY);
-  const tailorHeadingColorStorageKey = storageKey("skillai-resume-tailor-heading-color");
   const pageByRoute = {
     dashboard: ["Resume Dashboard", "Review the content extracted from your resume and choose a useful next step.", BarChart3],
     analyzer: ["Resume Analyzer", "Review text extracted from your resume and verify every finding.", FileText],
     builder: ["Resume Builder", "Create a clear, single-column resume from details you provide.", ListChecks],
     optimizer: ["Job Description Match", "Find exact catalog terms shared with a job description.", Target],
     "job-match": ["Job Match", "Find live listings and optionally rank them against your resume with AI.", BriefcaseBusiness],
-    tailor: ["Resume Tailor", "Create a professional, role-focused resume draft and download it as a Word document.", Sparkles],
+    tailor: ["Resume Tailor", "Focus an existing resume on one role without adding new claims.", Sparkles],
     "skill-gaps": ["Skill Gap Analysis", "Compare evidenced skills with a target role.", GraduationCap],
     "project-analyzer": ["Project Analyzer", "Evaluate project evidence and describe it professionally.", FolderKanban],
     profile: ["Career Profile", "Your reusable professional profile, grounded in your resume.", UserRound],
@@ -1171,9 +719,6 @@ function ResumeIntelligence({ user }) {
   const [notice, setNotice] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [tailorHeadingColor, setTailorHeadingColor] = useState(
-    () => readStored(tailorHeadingColorStorageKey, "#29483E"),
-  );
   const [aiLoading, setAiLoading] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiResults, setAiResults] = useState({});
@@ -1187,27 +732,14 @@ function ResumeIntelligence({ user }) {
 
   const analysis = useMemo(() => scanResume(resumeText), [resumeText]);
   const role = ROLES.find((item) => item.name === targetRole) || null;
-  const jobMatchReport = useMemo(
-    () => buildJobMatchReport(resumeText, jobDescription, role),
-    [resumeText, jobDescription, role],
-  );
   const jobSkills = useMemo(() => SKILL_CATALOG.filter((skill) => includesTerm(jobDescription, skill)), [jobDescription]);
   const matchedJobSkills = jobSkills.filter((skill) => includesTerm(resumeText, skill));
   const missingJobSkills = jobSkills.filter((skill) => !includesTerm(resumeText, skill));
+  const requiredRoleSkills = (role?.skills || []).filter((skill) => includesTerm(jobDescription, skill));
   const roleMatches = ROLES.map((item) => {
     const matches = item.skills.filter((skill) => includesTerm(resumeText, skill));
     return { ...item, matches, missing: item.skills.filter((skill) => !matches.includes(skill)) };
   }).sort((first, second) => second.matches.length - first.matches.length);
-  const skillSectors = analysis
-    ? SECTORS.map((sector) => ({
-      name: sector,
-      count: [...new Set(ROLES.filter((item) => item.sector === sector).flatMap((item) => item.skills))]
-        .filter((skill) => analysis.foundSkills.includes(skill)).length,
-    })).filter((sector) => sector.count > 0)
-      .sort((first, second) => second.count - first.count || first.name.localeCompare(second.name))
-    : [];
-  const sectionCount = Object.keys(SECTION_HEADINGS).length;
-  const sectionCoverage = analysis ? analysis.presentSections.length / sectionCount : 0;
   const targetRoleMatch = roleMatches.find((item) => item.name === targetRole);
   const comparisonVersions = comparisonIds.map((id) => versions.find((version) => String(version.id) === id) || null);
   const comparisonAnalyses = comparisonVersions.map((version) => version ? scanResume(version.text) : null);
@@ -1267,12 +799,7 @@ function ResumeIntelligence({ user }) {
         resumeText,
         ...details,
       });
-      let nextResult = result;
-      if (action === "tailor") {
-        const tailored = addMissingSkillsToResumeDraft(result.draft, missingJobSkills);
-        nextResult = { ...result, ...tailored };
-      }
-      setAiResults((current) => ({ ...current, [action]: nextResult }));
+      setAiResults((current) => ({ ...current, [action]: result }));
     } catch (error) {
       setAiError(error.message || "Resume AI could not complete this request. Please try again.");
     } finally {
@@ -1293,43 +820,6 @@ function ResumeIntelligence({ user }) {
     handleResumeRead(draft, "AI-tailored draft saved locally. Your original is available in Resume Versions.", false, "");
   };
 
-  const downloadTailoredDraft = async () => {
-    const draft = aiResults.tailor?.draft;
-    if (!draft) return;
-    setAiError("");
-    setAiLoading("tailor-download");
-    try {
-      const roleName = targetRole || "Tailored";
-      await downloadDocx(`${roleName} Resume`, draft, "classic", SECTIONS, tailorHeadingColor);
-    } catch (error) {
-      setAiError(error.message || "The tailored resume could not be downloaded. Please try again.");
-    } finally {
-      setAiLoading("");
-    }
-  };
-
-  const downloadTailoredPdf = () => {
-    const draft = aiResults.tailor?.draft;
-    if (!draft) return;
-    setAiError("");
-    const title = `${targetRole || "Tailored"} Resume`;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      setAiError("Your browser blocked the PDF window. Allow pop-ups for this site, then try Download PDF again.");
-      return;
-    }
-
-    try {
-      printWindow.opener = null;
-      printWindow.document.open();
-      printWindow.document.write(buildPrintableResume(title, draft, tailorHeadingColor));
-      printWindow.document.close();
-    } catch (error) {
-      printWindow.close();
-      setAiError(error.message || "The PDF preview could not be prepared. Please try again.");
-    }
-  };
-
   const addVersion = () => {
     if (!resumeText.trim()) {
       setNotice("Upload or build a resume before saving a version.");
@@ -1341,26 +831,16 @@ function ResumeIntelligence({ user }) {
     setNotice("A resume snapshot was saved on this device.");
   };
 
-  const exportResume = async (format, text = resumeText, template = "classic", sectionNames = SECTIONS, accentColor = "#A8401A") => {
+  const exportResume = async (format, text = resumeText) => {
     if (!text.trim()) {
       setNotice("Add or upload resume content before exporting.");
       return;
     }
     if (format === "docx") {
-      await downloadDocx("SkillAI Resume", text, template, sectionNames, accentColor);
+      await downloadDocx("SkillAI Resume", text);
       return;
     }
-    const cleanupPrintMode = () => document.body.classList.remove("ri-print-resume");
-    window.addEventListener("afterprint", cleanupPrintMode, { once: true });
-    document.body.classList.add("ri-print-resume");
-    try {
-      window.print();
-      window.setTimeout(cleanupPrintMode, 2000);
-    } catch (error) {
-      window.removeEventListener("afterprint", cleanupPrintMode);
-      cleanupPrintMode();
-      throw error;
-    }
+    window.print();
   };
 
   const [title, description, Icon] = pageByRoute[route] || pageByRoute.dashboard;
@@ -1387,272 +867,94 @@ function ResumeIntelligence({ user }) {
         </aside>
 
         <section className="ri-content">
-          <header className={`ri-page-heading${route === "dashboard" ? " ri-dashboard-page-heading" : ""}`}>
-            {route === "dashboard" ? (
-              <div className="ri-dashboard-welcome">
-                <div className="ri-dashboard-title-copy">
-                  <span className="eyebrow">CAREER WORKSPACE</span>
-                  <h1>Resume overview</h1>
-                  <p>Your resume and next steps, all in one place.</p>
-                </div>
-                <span className={`ri-dashboard-file-state${resumeText ? " ready" : ""}`}><i />{resumeText ? "Resume added" : "No resume yet"}</span>
-              </div>
-            ) : (
-              <div><span className="eyebrow">CAREER WORKSPACE / RESUME</span><h1><Icon size={25} />{title}</h1><p>{description}</p></div>
-            )}
-            {route !== "builder" && route !== "dashboard" && <Link to="/resume/builder" className="secondary-button">{resumeText ? "Edit resume" : "Build a resume"} <ArrowRight size={16} /></Link>}
+          <header className="ri-page-heading">
+            <div><span className="eyebrow">CAREER WORKSPACE / RESUME</span><h1><Icon size={25} />{title}</h1><p>{description}</p></div>
+            {route !== "builder" && <Link to="/resume/builder" className="secondary-button">{resumeText ? "Edit resume" : "Build a resume"} <ArrowRight size={16} /></Link>}
           </header>
-
-          {route === "dashboard" && (
-            <section className="ri-dashboard-metrics" aria-label="Resume summary">
-              <article><span className="ri-dashboard-metric-icon"><FileText size={17} /></span><div><small>Words</small><strong>{analysis ? analysis.wordCount.toLocaleString() : "—"}</strong><span>In your resume</span></div></article>
-              <article><span className="ri-dashboard-metric-icon skills"><Target size={17} /></span><div><small>Recognized skills</small><strong>{analysis ? analysis.foundSkills.length : "—"}</strong><span>Catalog terms found</span></div></article>
-              <article><span className="ri-dashboard-metric-icon sections"><ListChecks size={17} /></span><div><small>Sections found</small><strong>{analysis ? `${analysis.presentSections.length}/${sectionCount}` : "—"}</strong><span>Standard headings</span></div></article>
-              <article><span className="ri-dashboard-metric-icon versions"><Layers3 size={17} /></span><div><small>Saved versions</small><strong>{versions.length}</strong><span>On this device</span></div></article>
-            </section>
-          )}
-
-          {route === "dashboard" && (
-            <section className="ri-dashboard-top-grid" aria-label="Resume dashboard shortcuts">
-              <article className="ri-dashboard-resume-card">
-                <div className="ri-dashboard-card-heading">
-                  <span className="ri-card-icon"><FileText size={18} /></span>
-                  <div><h2>{resumeText ? "Your resume is ready" : "Add your resume"}</h2><p>{resumeText ? `${analysis.wordCount.toLocaleString()} words saved in this browser` : "Upload a file or create one to start."}</p></div>
-                </div>
-                <div className="ri-dashboard-top-actions">
-                  <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} compact hasResume={Boolean(resumeText)} />
-                  <Link to="/resume/builder" className="secondary-button"><ListChecks size={16} />Build resume</Link>
-                  {resumeText && <button type="button" className="secondary-button" onClick={addVersion}><Download size={16} />Save a copy</button>}
-                </div>
-              </article>
-              <aside className="ri-dashboard-quick-card">
-                <div><span className="ri-card-icon"><Sparkles size={18} /></span><div><h2>Go to</h2></div></div>
-                <Link to="/resume/analyzer"><span><FileText size={16} />Review resume</span><ChevronRight size={16} /></Link>
-                <Link to="/resume/optimizer"><span><Target size={16} />Compare a job</span><ChevronRight size={16} /></Link>
-                <Link to="/resume/versions"><span><Layers3 size={16} />Saved copies</span><ChevronRight size={16} /></Link>
-              </aside>
-            </section>
-          )}
 
           {notice && <div className="ri-notice" role="status"><Check size={16} />{notice}</div>}
           {aiError && route !== "job-match" && <p className="ri-job-error" role="alert">{aiError}</p>}
 
-          {route === "analyzer" ? (
-            <section id={route === "dashboard" ? "resume-upload" : undefined} className={`ri-upload-panel${resumeText ? " has-resume" : " is-empty"}`}>
+          {(route === "dashboard" || route === "analyzer") ? (
+            <section className={`ri-upload-panel${resumeText ? " has-resume" : " is-empty"}`}>
               <div className="ri-upload-copy">
                 <span className="ri-upload-kicker">{resumeText ? "RESUME READY" : "START WITH YOUR RESUME"}</span>
                 <strong>{resumeText ? "Your resume is ready to review" : "Bring your experience into focus"}</strong>
                 <p>{resumeText ? "Review the extracted text before using career tools. Your file stays on this device unless you choose an AI action." : "Upload an existing resume and we’ll extract its text locally, so you can review it before using career tools."}</p>
                 <span className="ri-upload-privacy"><ShieldCheck size={15} /> Stored in this browser · sent for AI review only when you choose an AI action</span>
-                {resumeText && <button type="button" className="ri-clear-button" onClick={clearResume}><Trash2 size={15} />Remove saved resume</button>}
+                {resumeText && <button type="button" className="ri-clear-button" onClick={clearResume}>Remove saved resume</button>}
               </div>
               <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} />
             </section>
-          ) : route !== "dashboard" && route !== "builder" ? (
-            <section className={`ri-resume-status${resumeText ? " has-resume" : " is-empty"}`}>
-              <span className={`ri-status-icon${resumeText ? " ready" : ""}`} aria-hidden="true">
-                {resumeText ? <FileCheck2 size={20} strokeWidth={1.8} /> : <FileUp size={20} strokeWidth={1.8} />}
-              </span>
-              <span className="ri-resume-status-copy">
-                <strong>{resumeText ? "Resume ready" : "No resume added yet"}</strong>
-                <small>{resumeText ? "Saved in this browser and ready for your career tools." : "Upload a resume to unlock analysis and matching tools."}</small>
-              </span>
-              {route === "job-match" && <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} compact hasResume={Boolean(resumeText)} />}
-              {route !== "builder" && route !== "job-match" && <Link to="/resume/analyzer">{resumeText ? "Review resume" : "Add resume"} <ArrowRight size={16} /></Link>}
+          ) : (
+            <section className="ri-resume-status">
+              <span className={`ri-status-dot${resumeText ? " ready" : ""}`} />
+              <span>{resumeText ? "Resume text available on this device" : "No resume text added yet"}</span>
+              {route === "job-match" && <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} compact />}
+              {route !== "builder" && route !== "job-match" && <Link to="/resume/analyzer">{resumeText ? "Review extracted text" : "Add a resume"} <ArrowRight size={14} /></Link>}
             </section>
-          ) : null}
+          )}
 
           {route === "dashboard" && (
-            <section className="ri-dashboard-grid">
-              <div className="ri-dashboard-main-column">
-                <div className="ri-analytics-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>Resume insights</h2></div><p>Counts from your resume text</p></div>
-                <section className="ri-dashboard-charts">
-                  <article className="ri-dashboard-widget ri-dashboard-coverage">
-                    <div className="ri-dashboard-widget-heading"><div><h2>Sections</h2><p>Standard headings found in your text</p></div><Link to="/resume/analyzer" aria-label="Review resume headings"><ArrowRight size={16} /></Link></div>
-                    {analysis ? (
-                      <div className="ri-coverage-content">
-                        <svg className="ri-coverage-chart" viewBox="0 0 120 120" role="img" aria-label={`${analysis.presentSections.length} of ${sectionCount} standard headings detected`}>
-                          <circle cx="60" cy="60" r="46" className="ri-coverage-track" />
-                          <circle cx="60" cy="60" r="46" className="ri-coverage-value" strokeDasharray={`${289 * sectionCoverage} ${289 * (1 - sectionCoverage)}`} transform="rotate(-90 60 60)" />
-                          <text x="60" y="57" className="ri-coverage-number">{analysis.presentSections.length}/{sectionCount}</text>
-                          <text x="60" y="75" className="ri-coverage-label">headings</text>
-                        </svg>
-                        <div className="ri-coverage-details">
-                          <strong>{analysis.presentSections.length} detected</strong>
-                          <span>{analysis.missingSections.length} not found in text</span>
-                          <small>Text check only</small>
-                          <div className="ri-section-key" aria-label="Detected headings">
-                            {analysis.presentSections.map((section) => <span key={section}>{section.charAt(0).toUpperCase() + section.slice(1)}</span>)}
-                          </div>
-                        </div>
-                      </div>
-                    ) : <div className="ri-chart-empty"><FileText size={18} /><span>Add a resume to see detected sections.</span></div>}
-                  </article>
-                  <article className="ri-dashboard-widget ri-dashboard-skills">
-                    <div className="ri-dashboard-widget-heading"><div><h2>Skills by field</h2><p>Recognized terms in your resume</p></div><Link to="/resume/profile" aria-label="Review detected skills"><ArrowRight size={16} /></Link></div>
-                    {analysis && skillSectors.length ? (
-                      <div className="ri-sector-chart" role="img" aria-label={`Detected skill terms grouped by field: ${skillSectors.map(({ name, count }) => `${name}, ${count}`).join("; ")}`}>
-                        {skillSectors.slice(0, 5).map(({ name, count }) => (
-                          <div className="ri-sector-row" key={name}>
-                            <span title={name}>{name}</span>
-                            <span className="ri-sector-track"><i style={{ width: `${Math.max(8, count / Math.max(...skillSectors.map((item) => item.count)) * 100)}%` }} /></span>
-                            <strong>{count}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <div className="ri-chart-empty"><Target size={18} /><span>{analysis ? "No catalog skill terms detected yet." : "Add a resume to see detected skill terms."}</span></div>}
-                  </article>
-                  <article className="ri-dashboard-widget ri-dashboard-writing-chart">
-                    <div className="ri-dashboard-widget-heading"><div><h2>Writing snapshot</h2><p>Bullet and number patterns</p></div><Link to="/resume/analyzer" aria-label="Review detected writing patterns"><ArrowRight size={16} /></Link></div>
-                    {analysis ? (
-                      <div className="ri-writing-chart-content">
-                        <div className="ri-writing-chart-main">
-                          {analysis.bullets.length ? (
-                            <>
-                              <div className="ri-writing-chart-total"><strong>{analysis.bullets.length}</strong><span>bullet lines</span></div>
-                              <div className="ri-writing-chart-bar" role="img" aria-label={`${analysis.actionBullets.length} of ${analysis.bullets.length} bullet lines begin with a verb from a limited built-in list; ${analysis.bullets.length - analysis.actionBullets.length} did not match that list`}>
-                                <span className="ri-writing-chart-action" style={{ width: `${(analysis.actionBullets.length / analysis.bullets.length) * 100}%` }} />
-                                <span className="ri-writing-chart-other" style={{ width: `${((analysis.bullets.length - analysis.actionBullets.length) / analysis.bullets.length) * 100}%` }} />
-                              </div>
-                              <div className="ri-writing-chart-legend">
-                                <span><i className="action" />{analysis.actionBullets.length} start with a listed action verb</span>
-                                <span><i className="other" />{analysis.bullets.length - analysis.actionBullets.length} do not</span>
-                              </div>
-                            </>
-                          ) : <div className="ri-writing-chart-empty">No bullet lines detected in the extracted text.</div>}
-                        </div>
-                        <div className="ri-writing-outcomes"><span>Phrases with numbers</span><strong>{analysis.quantifiedClaims.length}</strong><p>Text pattern only. Review each claim.</p></div>
-                      </div>
-                    ) : <div className="ri-chart-empty"><ListChecks size={18} /><span>Add a resume to explore text patterns.</span></div>}
-                    <p className="ri-dashboard-signal-note">Uses a short verb list. A line that does not match is not necessarily weak.</p>
-                  </article>
-                </section>
-
-                <section className="ri-dashboard-widget ri-dashboard-versions">
-                  <div className="ri-dashboard-widget-heading"><div><h2>Recent saves</h2><p>{versions.length ? `${versions.length} saved on this device` : "Your saved copies"}</p></div><Link to="/resume/versions" aria-label="View all resume versions">View all <ArrowRight size={14} /></Link></div>
-                  {versions.length ? (
-                    <div className="ri-dashboard-version-list">
-                      {versions.slice(-3).reverse().map((version) => (
-                        <div key={version.id}><span className="ri-version-file-icon"><FileText size={16} /></span><span><strong>{version.label}</strong><small>{version.role} · {new Date(version.date).toLocaleDateString()}</small></span><span className="ri-version-saved">Saved</span></div>
-                      ))}
+            <>
+              {analysis ? (
+                <>
+                  <div className="ri-dashboard-section-heading">
+                    <div><span className="eyebrow">DOCUMENT OVERVIEW</span><h2>Resume content at a glance</h2><p>Counts below are calculated from extracted text—not quality scores or hiring predictions.</p></div>
+                    <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null, "skill-gaps": null })); }} />
+                  </div>
+                  <div className="ri-score-grid">
+                    <MetricCard label="Words extracted" value={analysis.wordCount} note="Tokens found in the uploaded document" />
+                    <MetricCard label="Recognized skill terms" value={analysis.foundSkills.length} note="Exact terms from the platform’s role catalog" />
+                    <MetricCard label="Bullet lines" value={analysis.bullets.length} note="Lines with a standard bullet marker" />
+                    <MetricCard label="Outcome phrases" value={analysis.quantifiedClaims.length} note="Limited pattern; review each claim yourself" />
+                  </div>
+                  <div className="ri-dashboard-panels">
+                    <article className="ri-card ri-dashboard-card">
+                      <div className="ri-card-title-row"><span className="ri-card-icon"><FileText size={18} /></span><div><h2>Extracted sections</h2><p>Standard headings recognized in the text</p></div></div>
+                      {analysis.presentSections.length ? <div className="ri-chip-list">{analysis.presentSections.map((section) => <span key={section}><Check size={13} />{section}</span>)}</div> : <p>No standard headings were detected. Check the extracted text before editing the original resume.</p>}
+                      <Link to="/resume/analyzer" className="text-link">Review extracted text <ArrowRight size={15} /></Link>
+                    </article>
+                    <article className="ri-card ri-dashboard-card">
+                      <div className="ri-card-title-row"><span className="ri-card-icon target"><Target size={18} /></span><div><h2>Role term check</h2><p>{targetRoleMatch ? `${targetRoleMatch.name} · ${targetRoleMatch.sector}` : "Choose a role to compare catalog terms"}</p></div></div>
+                      {targetRoleMatch ? <><strong className="ri-match-count">{targetRoleMatch.matches.length} of {targetRoleMatch.skills.length} catalog terms found</strong><InfoRows label="Terms found" values={targetRoleMatch.matches} empty="No terms from this role were found in the extracted text." /></> : <p>This is a keyword check only; it does not determine whether a role is right for you.</p>}
+                    </article>
+                  </div>
+                  <div className="ri-workflow-card">
+                    <div><span className="eyebrow">NEXT STEPS</span><h2>Continue working on your resume</h2><p>Review extraction first, then use a tool that matches your current goal.</p></div>
+                    <div className="ri-workflow-links">
+                      <Link to="/resume/analyzer"><span>01</span><strong>Review resume text</strong><ArrowRight size={15} /></Link>
+                      <Link to="/resume/optimizer"><span>02</span><strong>Compare with a job description</strong><ArrowRight size={15} /></Link>
+                      <Link to="/resume/builder"><span>03</span><strong>Edit or build a resume</strong><ArrowRight size={15} /></Link>
                     </div>
-                  ) : <div className="ri-version-empty">{resumeText ? "Save a copy when you want to keep a snapshot before making changes." : "Add a resume, then save versions to keep important drafts."}</div>}
+                  </div>
+                </>
+              ) : (
+                <section className="ri-empty-dashboard">
+                  <span className="ri-empty-icon"><FileText size={25} /></span>
+                  <span className="eyebrow">YOUR RESUME WORKSPACE</span>
+                  <h2>Start with your own resume</h2>
+                  <p>Upload a file to inspect its extracted text, compare terms with a job description, and build role-specific resume drafts. No example scores or sample resume data are shown.</p>
+                  <ul><li>PDF, DOC, DOCX, or TXT</li><li>Maximum file size: 10 MB</li><li>Text extraction stays in this browser</li></ul>
+                  <Link to="/resume/builder" className="secondary-button">Start with the resume builder <ArrowRight size={16} /></Link>
                 </section>
-              </div>
-
-              <aside className="ri-dashboard-side-column">
-                <section className="ri-dashboard-widget ri-dashboard-role-match">
-                  <div className="ri-dashboard-widget-heading"><div><h2>Compare a role</h2><p>See which listed skills appear in your text</p></div></div>
-                  <TargetRoleSelect value={targetRole} onChange={setTargetRole} label="Target role" />
-                  {analysis && role ? (
-                    <>
-                      <div className="ri-role-match-summary"><strong>{targetRoleMatch?.matches.length || 0}<span> / {role.skills.length}</span></strong><span>skills found in text</span></div>
-                      <div className="ri-role-match-track" role="progressbar" aria-label={`Catalog terms detected for ${role.name}`} aria-valuemin={0} aria-valuemax={role.skills.length} aria-valuenow={targetRoleMatch?.matches.length || 0}><i style={{ width: `${((targetRoleMatch?.matches.length || 0) / role.skills.length) * 100}%` }} /></div>
-                      <details className="ri-role-match-details">
-                        <summary>See matched and missing terms</summary>
-                        <div><strong>Detected in text</strong><p>{targetRoleMatch?.matches.length ? targetRoleMatch.matches.join(", ") : "No catalog terms detected."}</p></div>
-                        <div><strong>Not detected in text</strong><p>{targetRoleMatch?.missing.join(", ") || "All role catalog terms were detected."}</p></div>
-                      </details>
-                      <p className="ri-role-match-note">A missing term may still describe your experience. Check your resume.</p>
-                      <Link className="ri-role-match-link" to="/resume/skill-gaps">Review role skills <ArrowRight size={14} /></Link>
-                    </>
-                  ) : <p className="ri-role-match-empty">{analysis ? "Choose a role to compare its catalog terms with your resume text. This is not a suitability score." : "Add a resume before comparing role terms. This is not a suitability score."}</p>}
-                </section>
-
-                <section className="ri-dashboard-widget ri-dashboard-private"><ShieldCheck size={16} /><p>Your resume stays in this browser. It is sent to AI only when you choose an AI action.</p></section>
-              </aside>
-            </section>
+              )}
+            </>
           )}
 
           {route === "analyzer" && (
             <>
-              <section className="ri-analyzer-stats" aria-label="Resume text statistics">
-                <div className="ri-analyzer-stats-heading"><div><span className="eyebrow">RESUME ANALYSIS</span><h2>Resume stats</h2></div><span>ATS score estimate · text-based heuristic</span></div>
-                <div className="ri-analyzer-stat-grid">
-                  <article><span className="ri-analyzer-stat-icon"><FileText size={18} /></span><div><small>Words extracted</small><strong>{analysis ? analysis.wordCount.toLocaleString() : "—"}</strong><span>From the uploaded resume</span></div></article>
-                  <article><span className="ri-analyzer-stat-icon skills"><Target size={18} /></span><div><small>Recognized skills</small><strong>{analysis ? analysis.foundSkills.length : "—"}</strong><span>Matches in a built-in list</span></div></article>
-                  <article><span className="ri-analyzer-stat-icon sections"><ListChecks size={18} /></span><div><small>Sections detected</small><strong>{analysis ? `${analysis.presentSections.length}/${sectionCount}` : "—"}</strong><span>Standard headings in text</span></div></article>
-                  <article><span className="ri-analyzer-stat-icon bullets"><BarChart3 size={18} /></span><div><small>Bullet lines</small><strong>{analysis ? analysis.bullets.length : "—"}</strong><span>{analysis ? `${analysis.actionBullets.length} start with a listed action verb` : "From extracted text"}</span></div></article>
-                </div>
-                {analysis ? (
-                  <>
-                    <article className={`ri-analyzer-score-card${analysis.atsReadiness.score >= 80 ? " strong" : analysis.atsReadiness.score >= 60 ? " good" : analysis.atsReadiness.score >= 40 ? " developing" : " needs-work"}`}>
-                      <div className="ri-analyzer-score-overview">
-                        <div className="ri-analyzer-score-heading"><span className="eyebrow">TEXT-BASED ESTIMATE</span><h3>ATS score</h3><p>Resume structure, contact details, skills and writing patterns.</p></div>
-                        <div className="ri-analyzer-score-gauge" role="img" aria-label={`Estimated ATS score ${analysis.atsReadiness.score} out of 100; ${analysis.atsReadiness.label}`}>
-                          <svg viewBox="0 0 120 120" aria-hidden="true">
-                            <circle cx="60" cy="60" r="47" className="ri-analyzer-score-track" />
-                            <circle cx="60" cy="60" r="47" className="ri-analyzer-score-value" strokeDasharray={`${295 * analysis.atsReadiness.score / 100} ${295 * (1 - analysis.atsReadiness.score / 100)}`} transform="rotate(-90 60 60)" />
-                          </svg>
-                          <span><strong>{analysis.atsReadiness.score}</strong><small>/ 100</small></span>
-                        </div>
-                        <span className="ri-analyzer-score-label">{analysis.atsReadiness.label}</span>
-                      </div>
-                      <div className="ri-analyzer-score-breakdown">
-                        {analysis.atsReadiness.factors.map((factor) => (
-                          <div className="ri-analyzer-score-factor" key={factor.label}>
-                            <div><span>{factor.label}</span><strong>{factor.score}<small> / {factor.max}</small></strong></div>
-                            <div className="ri-analyzer-score-factor-track" role="progressbar" aria-label={factor.label} aria-valuemin={0} aria-valuemax={factor.max} aria-valuenow={factor.score}><i style={{ width: `${factor.score / factor.max * 100}%` }} /></div>
-                            <small>{factor.detail}</small>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="ri-analyzer-score-disclaimer">This is a SkillAI heuristic from extracted text, not a score from an employer’s ATS. It does not test file layout, compare a job description, or predict screening or hiring results. Check the original resume and tailor it to the specific role.</p>
-                    </article>
-                    <div className="ri-analyzer-chart-grid">
-                    <article className="ri-analyzer-chart-card">
-                      <div className="ri-analyzer-chart-heading"><div><h3>Section coverage</h3><p>Standard headings detected in extracted text</p></div><span>{analysis.presentSections.length}/{sectionCount}</span></div>
-                      <div className="ri-analyzer-coverage-content">
-                        <svg className="ri-analyzer-coverage-chart" viewBox="0 0 120 120" role="img" aria-label={`${analysis.presentSections.length} of ${sectionCount} standard resume headings detected`}>
-                          <circle cx="60" cy="60" r="46" className="ri-analyzer-coverage-track" />
-                          <circle cx="60" cy="60" r="46" className="ri-analyzer-coverage-value" strokeDasharray={`${289 * sectionCoverage} ${289 * (1 - sectionCoverage)}`} transform="rotate(-90 60 60)" />
-                          <text x="60" y="57" className="ri-analyzer-coverage-number">{analysis.presentSections.length}/{sectionCount}</text>
-                          <text x="60" y="75" className="ri-analyzer-coverage-label">headings</text>
-                        </svg>
-                        <div className="ri-analyzer-section-list">
-                          {Object.keys(SECTION_HEADINGS).map((section) => {
-                            const detected = analysis.presentSections.includes(section);
-                            const label = section.charAt(0).toUpperCase() + section.slice(1);
-                            return <span className={detected ? "detected" : ""} key={section}><i />{label}</span>;
-                          })}
-                        </div>
-                      </div>
-                      <p className="ri-analyzer-chart-note">A heading not detected here may still exist in a format the text extractor could not read.</p>
-                    </article>
-                    <article className="ri-analyzer-chart-card">
-                      <div className="ri-analyzer-chart-heading"><div><h3>Skills by field</h3><p>Recognized catalog terms grouped by sector</p></div><span>{analysis.foundSkills.length} found</span></div>
-                      {skillSectors.length ? (
-                        <div className="ri-analyzer-sector-chart" role="img" aria-label={`Recognized terms by field: ${skillSectors.map(({ name, count }) => `${name}, ${count}`).join("; ")}`}>
-                          {skillSectors.slice(0, 5).map(({ name, count }) => (
-                            <div className="ri-analyzer-sector-row" key={name}>
-                              <span title={name}>{name}</span><span className="ri-analyzer-sector-track"><i style={{ width: `${Math.max(8, count / Math.max(...skillSectors.map((item) => item.count)) * 100)}%` }} /></span><strong>{count}</strong>
-                            </div>
-                          ))}
-                        </div>
-                      ) : <div className="ri-analyzer-chart-empty"><Target size={19} /><span>No built-in catalog terms detected in the text.</span></div>}
-                      <div className="ri-analyzer-skill-tags" aria-label="Recognized skills">{analysis.foundSkills.slice(0, 10).map((skill) => <span key={skill}>{skill}</span>)}{analysis.foundSkills.length > 10 && <span>+{analysis.foundSkills.length - 10} more</span>}</div>
-                    </article>
-                    <article className="ri-analyzer-chart-card ri-analyzer-writing-card">
-                      <div className="ri-analyzer-chart-heading"><div><h3>Writing patterns</h3><p>Bullet starts and number patterns in your text</p></div><span>Text check only</span></div>
-                      <div className="ri-analyzer-writing-layout">
-                        <div className="ri-analyzer-writing-main">
-                          <div className="ri-analyzer-writing-label"><strong>{analysis.actionBullets.length}<span> / {analysis.bullets.length}</span></strong><span>bullet lines start with a verb from a limited list</span></div>
-                          <div className="ri-analyzer-writing-track" role="img" aria-label={`${analysis.actionBullets.length} of ${analysis.bullets.length} bullet lines start with a listed action verb`}>
-                            <i style={{ width: `${analysis.bullets.length ? (analysis.actionBullets.length / analysis.bullets.length) * 100 : 0}%` }} />
-                          </div>
-                          <div className="ri-analyzer-writing-legend"><span><i className="action" />Listed action-verb starts</span><span><i />Other bullet starts</span></div>
-                        </div>
-                        <div className="ri-analyzer-quantified"><small>Number-pattern phrases</small><strong>{analysis.quantifiedClaims.length}</strong><span>Review each claim against your source.</span></div>
-                      </div>
-                      <p className="ri-analyzer-chart-note">A bullet outside the limited verb list is not necessarily weak. No claims are independently verified.</p>
-                    </article>
-                    </div>
-                  </>
-                ) : (
-                  <div className="ri-analyzer-stats-empty"><FileText size={20} /><strong>Your stats will appear here</strong><span>Upload a resume above to see section, skill and writing-pattern charts.</span></div>
-                )}
-              </section>
-              <article className="ri-card ri-analyzer-source"><h2>Review the source, not just the parser</h2><p>Check extracted text against the original resume. If a heading or line is missing here, verify the source PDF before changing your resume.</p>{analysis && <details className="ri-extracted-text"><summary>Review extracted resume text</summary><pre>{resumeText}</pre></details>}</article>
+              <div className="ri-columns">
+                <article className="ri-card"><h2>Headings not detected in extracted text</h2>{analysis ? <>{analysis.missingSections.length ? <ul>{analysis.missingSections.map((item) => <li key={item}>{item}</li>)}</ul> : <p>All standard headings in the limited built-in list were detected.</p>}<p className="ri-disclaimer">This is a text-parser result, not a finding that your resume is missing these sections. Review the extracted text and the original file.</p></> : <p>Upload a resume to inspect its extracted text.</p>}</article>
+                <article className="ri-card"><h2>Text patterns detected</h2>{analysis ? <ul>{[
+                  `${analysis.wordCount} words extracted`,
+                  `${analysis.foundSkills.length} recognized catalog terms`,
+                  `${analysis.bullets.length} bullet lines`,
+                  `${analysis.actionBullets.length} bullet lines beginning with a limited set of action verbs`,
+                  `${analysis.quantifiedClaims.length} phrases matching a limited outcome-and-number pattern`,
+                ].map((item) => <li key={item}>{item}</li>)}</ul> : <p>Detected text patterns will appear here after upload.</p>}<p className="ri-disclaimer">These are counts only. No grammar, career-gap, ATS, recruiter, or claim-verification analysis is performed.</p></article>
+              </div>
+              <article className="ri-card"><h2>Review the source, not just the parser</h2><p>Check the extracted text against the original resume. If a heading or line is missing here, verify the source PDF before changing your resume.</p>{analysis && <details className="ri-extracted-text"><summary>Review extracted resume text</summary><pre>{resumeText}</pre></details>}</article>
               {analysis?.quantifiedClaims.length > 0 && <article className="ri-card"><h2>Evidence review</h2><p>Check the source for every measurable claim. SkillAI has not independently verified these statements.</p>{analysis.quantifiedClaims.map((claim) => <div className="ri-evidence-row" key={claim}><span className="ri-priority medium">User-provided</span><span>{claim}</span><strong>Needs evidence</strong></div>)}</article>}
               <section className="ri-card ri-ai-resume-card">
                 <div className="ri-section-heading"><div><span className="eyebrow">AI WRITING COACH</span><h2>Get an evidence-based resume review</h2><p>AI reviews clarity and relevance using only the text you provide. It cannot verify claims or predict hiring results.</p></div><button type="button" className="primary-button" onClick={() => void runAI("analyze")} disabled={Boolean(aiLoading) || resumeText.trim().length < 80}>{aiLoading === "analyze" ? "Reviewing…" : "Review with AI"} <Sparkles size={16} /></button></div>
@@ -1673,22 +975,11 @@ function ResumeIntelligence({ user }) {
 
           {route === "optimizer" && (
             <section className="ri-card">
-              <h2>Compare your resume with a job description</h2>
-              <p>Choose the target role and paste the job description for a transparent, evidence-based text comparison. Your resume and job description stay in this browser for this analysis.</p>
+              <h2>Compare resume terms with a job description</h2><p>Paste the job description. This tool reports exact matches for terms in its built-in catalog; it does not calculate an ATS score or judge your suitability.</p>
               <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null })); }} />
-              <label className="ri-job-description-field">
-                Job description
-                <textarea className="ri-textarea" rows={9} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste the complete job description, including responsibilities and requirements…" />
-                <span>{jobDescription.length.toLocaleString()} / 12,000 characters · Keep the original wording for a more useful comparison.</span>
-              </label>
-              <JobMatchReport
-                report={jobMatchReport}
-                hasResume={resumeText.trim().length >= 80}
-                hasRole={Boolean(role)}
-                hasJobDescription={jobDescription.trim().length >= 40}
-                roleName={role?.name || ""}
-              />
-              {jobMatchReport && <Link to="/resume/tailor" className="primary-button">Review improvements in Resume Tailor <ArrowRight size={16} /></Link>}
+              <textarea className="ri-textarea" rows={8} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste the full job description here…" />
+              {jobDescription && <div className="ri-optimizer-results"><MetricCard label="Catalog terms found in job description" value={jobSkills.length} note="Exact built-in cross-sector skill terms" /><MetricCard label="Those terms also found in resume" value={matchedJobSkills.length} note="Text matches only; not an ATS score" /><InfoRows label="Selected-role terms found in the job description" values={requiredRoleSkills} empty={role ? "No selected-role catalog terms found in the description." : "Choose a target role to check role-specific terms."} /><InfoRows label="Catalog terms in both texts" values={matchedJobSkills} empty="No exact catalog terms found in both texts." /><InfoRows label="Catalog terms in job description but not resume text" values={missingJobSkills} empty="No additional catalog terms detected in the job description." /><InfoRows label="Experience, education, job title, and industry" values={["Not evaluated. Compare these requirements against the original job description and your verified experience."]} empty="" /></div>}
+              <Link to="/resume/tailor" className="primary-button">Optimize relevant sections <ArrowRight size={16} /></Link>
             </section>
           )}
 
@@ -1698,30 +989,16 @@ function ResumeIntelligence({ user }) {
 
           {route === "tailor" && (
             <section className="ri-card">
-              <h2>Create a professional resume for this job</h2><p>Paste the job description to match its relevant skills with your resume. Detected skills missing from your resume will be added under the Skills heading, not as a detached keyword list. Review the draft, then download it as Word or PDF.</p>
+              <h2>Tailor only what is relevant</h2><p>Share a job description to get an AI-assisted role-focused draft based only on facts already in your resume. Review every change before using it.</p>
               <TargetRoleSelect value={targetRole} onChange={(value) => { setTargetRole(value); setAiResults((current) => ({ ...current, tailor: null })); }} />
-              <textarea className="ri-textarea" rows={7} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste the job description you want to target…" />
-              <label className="ri-tailor-heading-color">
-                <span><strong>Resume heading color</strong><small>Choose the same color used in your original resume. It will be saved for your next visit and used in Word and PDF downloads.</small></span>
-                <input
-                  type="color"
-                  aria-label="Resume heading color"
-                  value={normalizeHexColor(tailorHeadingColor)}
-                  onChange={(event) => {
-                    const color = normalizeHexColor(event.target.value);
-                    setTailorHeadingColor(color);
-                    writeStored(tailorHeadingColorStorageKey, color);
-                  }}
-                />
-              </label>
-              <div className="ri-ai-action-row"><button type="button" className="primary-button" onClick={() => void runAI("tailor", { targetRole, jobDescription })} disabled={Boolean(aiLoading) || resumeText.trim().length < 80 || jobDescription.trim().length < 40}>{aiLoading === "tailor" ? "Tailoring your resume…" : "Tailor my resume for this job"} <Sparkles size={16} /></button><span className="ri-ai-privacy-note"><ShieldCheck size={14} /> Resume and job description are sent to AI only when you choose this action.</span></div>
-              {aiError && <p className="ri-job-warning" role="alert">{aiError}</p>}
+              <textarea className="ri-textarea" rows={7} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setAiResults((current) => ({ ...current, tailor: null })); }} placeholder="Paste a specific job description…" />
+              <div className="ri-before-after"><article><span className="eyebrow">BEFORE · SOURCE TEXT</span><pre>{resumeText || "Upload or create a resume to begin."}</pre></article><article><span className="eyebrow">KEYWORD CHECK · EXACT TERMS</span><pre>{resumeText ? (matchedJobSkills.length ? `Catalog terms found in both the job description and resume text:\n${matchedJobSkills.join("\n")}\n\nThis exact-term check is separate from the AI-tailored draft below.` : "No matching catalog terms were detected. AI can still review the full description and resume for relevant evidence.") : "Your source resume will appear here after upload."}</pre></article></div>
+              <div className="ri-ai-action-row"><button type="button" className="primary-button" onClick={() => void runAI("tailor", { targetRole, jobDescription })} disabled={Boolean(aiLoading) || resumeText.trim().length < 80 || jobDescription.trim().length < 40}>{aiLoading === "tailor" ? "Creating a tailored draft…" : "Create AI-tailored draft"} <Sparkles size={16} /></button><span className="ri-ai-privacy-note"><ShieldCheck size={14} /> Resume and job description are sent to AI only when you choose this action.</span></div>
               {aiResults.tailor && <div className="ri-ai-tailor-result">
-                <div className="ri-section-heading"><div><span className="eyebrow">YOUR JOB-TAILORED RESUME</span><h3>Review your professional draft</h3><p>Check every detail against your original before downloading or applying.</p></div><div className="ri-tailor-result-actions"><button type="button" className="primary-button" onClick={() => void downloadTailoredDraft()} disabled={Boolean(aiLoading)}><Download size={16} />{aiLoading === "tailor-download" ? "Preparing Word file…" : "Download Word resume"}</button><button type="button" className="secondary-button" onClick={downloadTailoredPdf}><Download size={16} /> Download PDF</button><button type="button" className="secondary-button" onClick={applyTailoredDraft}>Save as my current resume</button></div></div>
-                {aiResults.tailor.addedSkills.length > 0 && <p className="ri-ai-summary">{aiResults.tailor.addedSkills.length} JD skill{aiResults.tailor.addedSkills.length === 1 ? "" : "s"} missing from the source resume {aiResults.tailor.addedSkills.length === 1 ? "was" : "were"} placed in the resume’s Skills section. Please verify them before applying.</p>}
-                <pre aria-label="Job-tailored resume preview">{aiResults.tailor.draft}</pre>
+                <div className="ri-section-heading"><div><span className="eyebrow">AI-GENERATED DRAFT</span><h3>Review before applying</h3></div><button type="button" className="secondary-button" onClick={applyTailoredDraft}>Use draft and save original version</button></div>
+                <pre>{aiResults.tailor.draft}</pre>
                 <div className="ri-columns"><article><h3>Changes made</h3><ul>{aiResults.tailor.changes.map((item, index) => <li key={`change-${index}`}>{item}</li>)}</ul></article><article><h3>Evidence to review</h3>{aiResults.tailor.reviewNotes.length ? <ul>{aiResults.tailor.reviewNotes.map((item, index) => <li key={`review-${index}`}>{item}</li>)}</ul> : <p>No specific missing-evidence notes returned. Still verify every detail against your original.</p>}</article></div>
-                <p className="ri-disclaimer">AI can still introduce errors. Saving this as your current resume stores the original in Resume Versions; verify all claims before downloading or applying.</p>
+                <p className="ri-disclaimer">AI can still introduce errors. Applying the draft saves your current resume to Resume Versions first; verify all claims before exporting or applying.</p>
               </div>}
               <p className="ri-disclaimer">AI may miss or misinterpret information. No experience, skills, metrics, or project results should be used unless you can verify them.</p>
             </section>
@@ -1844,235 +1121,12 @@ function ResumeIntelligence({ user }) {
   );
 }
 
-function TargetRoleSelect({ value, onChange, label = "Sector and target role" }) {
-  return <label className="ri-role-select">{label}<select value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose a role</option>{SECTORS.map((sector) => <optgroup label={sector} key={sector}>{ROLES.filter((role) => role.sector === sector).map((role) => <option key={role.name} value={role.name}>{role.name}</option>)}</optgroup>)}</select></label>;
+function TargetRoleSelect({ value, onChange }) {
+  return <label className="ri-role-select">Sector and target role<select value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose a sector and role</option>{SECTORS.map((sector) => <optgroup label={sector} key={sector}>{ROLES.filter((role) => role.sector === sector).map((role) => <option key={role.name} value={role.name}>{role.name}</option>)}</optgroup>)}</select></label>;
 }
 
 function InfoRows({ label, values, empty }) {
   return <div className="ri-info-row"><strong>{label}</strong>{values.length ? <div>{values.map((value) => <span key={value}>{value}</span>)}</div> : <small>{empty}</small>}</div>;
-}
-
-function JobMatchReport({ report, hasResume, hasRole, hasJobDescription, roleName }) {
-  if (!report) {
-    const missingInputs = [
-      !hasResume && "Upload or add at least 80 characters of resume text",
-      !hasRole && "Choose the target role",
-      !hasJobDescription && "Paste at least 40 characters of the job description",
-    ].filter(Boolean);
-
-    return (
-      <div className="ri-job-match-empty" role="status">
-        <h3>Complete these inputs to see your comparison</h3>
-        <ul>{missingInputs.map((item) => <li key={item}>{item}</li>)}</ul>
-        <p>The analysis runs locally in your browser and updates as you edit.</p>
-      </div>
-    );
-  }
-
-  const factorsId = "job-match-score-factors";
-  return (
-    <div className="ri-job-match-report" aria-labelledby="job-match-report-title">
-      <section className="ri-job-match-score">
-        <div className="ri-job-match-score-number" aria-label={`Text alignment score ${report.score.toFixed(1)} out of 10`}>
-          <strong>{report.score.toFixed(1)}</strong><span>/ 10</span>
-        </div>
-        <div className="ri-job-match-score-summary">
-          <span className="eyebrow">TEXT ALIGNMENT</span>
-          <h3 id="job-match-report-title">{report.scoreLabel}</h3>
-          <p>For <strong>{roleName}</strong>. This is a resume-to-description text comparison, not a measure of your ability or likelihood of being hired.</p>
-          <div
-            className="ri-job-match-score-track"
-            role="progressbar"
-            aria-label="Resume text alignment"
-            aria-valuemin={0}
-            aria-valuemax={10}
-            aria-valuenow={report.score}
-            aria-describedby={factorsId}
-          ><span style={{ width: `${report.score * 10}%` }} /></div>
-        </div>
-      </section>
-
-      <section className="ri-job-match-factors" id={factorsId} aria-label="How the score is calculated">
-        <div className="ri-job-match-section-heading">
-          <div><h3>How this score is calculated</h3><p>Each factor is scored from 0 to 10, then weighted as shown.</p></div>
-          <span>Heuristic, not an employer ATS score</span>
-        </div>
-        {report.factors.map((factor) => (
-          <div className="ri-job-match-factor" key={factor.label}>
-            <div className="ri-job-match-factor-title">
-              <strong>{factor.label}</strong>
-              <span>{factor.score.toFixed(1)} / 10 · {factor.weight}% weight · {factor.weightedPoints.toFixed(1)} points</span>
-            </div>
-            <div className="ri-job-match-factor-track" role="progressbar" aria-label={`${factor.label} score`} aria-valuemin={0} aria-valuemax={10} aria-valuenow={factor.score}>
-              <span style={{ width: `${factor.score * 10}%` }} />
-            </div>
-            <p>{factor.detail}</p>
-          </div>
-        ))}
-        <p className="ri-job-match-method-note">{report.requirementsSource}. Skill and keyword matches use normalized text terms; section checks use headings. Related wording or equivalent experience may not be detected.</p>
-      </section>
-
-      <section className="ri-job-match-section">
-        <div className="ri-job-match-section-heading"><div><h3>Job requirements</h3><p>{report.requirements.length} catalog skill terms used in this comparison</p></div></div>
-        <InfoRows label={`Selected-role skills mentioned in the job description · ${report.roleSkillsInJd.length}`} values={report.roleSkillsInJd} empty="No selected-role catalog terms were detected in the job description." />
-        <div className="ri-job-match-lists">
-          <InfoRows label={`Found in resume · ${report.matchedRequirements.length}`} values={report.matchedRequirements} empty="No selected requirement terms were detected in the resume text." />
-          <InfoRows label={`Not found in resume · ${report.missingRequirements.length}`} values={report.missingRequirements} empty="All selected requirement terms were detected. Check that each has a truthful example." />
-        </div>
-      </section>
-
-      <section className="ri-job-match-section">
-        <div className="ri-job-match-section-heading"><div><h3>{roleName} role skills</h3><p>{report.matchedRoleSkills.length} of {report.matchedRoleSkills.length + report.missingRoleSkills.length} catalog terms found in your resume</p></div></div>
-        <div className="ri-job-match-lists">
-          <InfoRows label={`Found in resume · ${report.matchedRoleSkills.length}`} values={report.matchedRoleSkills} empty="No target-role catalog terms were detected." />
-          <InfoRows label={`Not found in resume · ${report.missingRoleSkills.length}`} values={report.missingRoleSkills} empty="All target-role catalog terms were detected." />
-        </div>
-      </section>
-
-      <section className="ri-job-match-section">
-        <div className="ri-job-match-section-heading"><div><h3>Frequent job-description terms</h3><p>{report.matchedKeywords.length} of {report.jdKeywordCount} selected terms also occur in your resume</p></div></div>
-        <div className="ri-job-match-lists">
-          <InfoRows label={`Also in resume · ${report.matchedKeywords.length}`} values={report.matchedKeywords} empty="No frequent non-skill terms overlapped." />
-          <InfoRows label={`Not found in resume · ${report.missingKeywords.length}`} values={report.missingKeywords} empty="No additional frequent terms to review." />
-        </div>
-      </section>
-
-      <section className="ri-job-match-section">
-        <div className="ri-job-match-section-heading"><div><h3>Recommended next steps</h3><p>Use only suggestions supported by your real experience.</p></div></div>
-        <div className="ri-job-match-recommendations">
-          {report.recommendations.map((recommendation, index) => (
-            <article key={recommendation.title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div><div><strong>{recommendation.title}</strong><small>{recommendation.priority}</small></div><p>{recommendation.detail}</p></div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <p className="ri-job-match-disclaimer"><ShieldCheck size={16} /> This local heuristic checks catalog skills, frequent terms, and section headings. It does not understand context reliably, verify claims, or predict ATS decisions, interview chances, or hiring outcomes. Review the original job description and every suggestion yourself.</p>
-    </div>
-  );
-}
-
-const RESUME_TEMPLATES = [
-  { id: "classic", name: "Professional", description: "The clean single-column style from your CV.", headshot: false, graphics: "None", columns: 1 },
-  { id: "modern", name: "Modern", description: "Contemporary spacing with accent section titles.", headshot: true, graphics: "Simple", columns: 1 },
-  { id: "compact", name: "Compact", description: "Tighter layout to fit more content on each page.", headshot: false, graphics: "None", columns: 1 },
-  { id: "executive", name: "Executive", description: "A centered, confident header for leadership roles.", headshot: true, graphics: "Simple", columns: 1 },
-  { id: "sidebar", name: "Sidebar", description: "A strong left rail with neatly grouped sections.", headshot: true, graphics: "Decorative", columns: 2 },
-  { id: "minimal", name: "Minimal", description: "Simple typography with plenty of breathing room.", headshot: false, graphics: "None", columns: 1 },
-  { id: "bold", name: "Bold", description: "High-contrast headings and a prominent name.", headshot: false, graphics: "Decorative", columns: 1 },
-  { id: "elegant", name: "Elegant", description: "A refined, centered layout with classic typography.", headshot: false, graphics: "Simple", columns: 1 },
-  { id: "technical", name: "Technical", description: "Precise typography for engineering and technology.", headshot: false, graphics: "Simple", columns: 1 },
-  { id: "clean", name: "Clean", description: "Quiet section markers and a crisp page structure.", headshot: false, graphics: "None", columns: 1 },
-  { id: "split", name: "Split Columns", description: "A strong side column for skills and education.", headshot: true, graphics: "Decorative", columns: 2 },
-  { id: "timeline", name: "Timeline", description: "A vertical accent line connects your career sections.", headshot: false, graphics: "Simple", columns: 1 },
-  { id: "banner", name: "Color Banner", description: "A bold full-width name banner anchors the page.", headshot: true, graphics: "Decorative", columns: 1 },
-  { id: "editorial", name: "Editorial", description: "Serif typography and spacious editorial hierarchy.", headshot: false, graphics: "Simple", columns: 1 },
-  { id: "infographic", name: "Skill Focus", description: "Skills-first hierarchy for technical profiles.", headshot: false, graphics: "Decorative", columns: 1 },
-  { id: "monochrome", name: "Monochrome", description: "High-contrast grayscale with a compact header.", headshot: false, graphics: "None", columns: 1 },
-  { id: "framed", name: "Framed", description: "A fine accent frame surrounds a classic page.", headshot: false, graphics: "Simple", columns: 1 },
-  { id: "topline", name: "Topline", description: "A crisp top rule and structured section dividers.", headshot: true, graphics: "Simple", columns: 1 },
-  { id: "portfolio", name: "Portfolio", description: "A project-oriented two-column professional layout.", headshot: true, graphics: "Decorative", columns: 2 },
-  { id: "stacked", name: "Stacked Header", description: "A centered nameplate with orderly content below.", headshot: false, graphics: "None", columns: 1 },
-];
-
-const TEMPLATE_COLORS = [
-  { name: "Rust", hex: "#A8401A" },
-  { name: "Charcoal", hex: "#323940" },
-  { name: "Taupe", hex: "#AD9E98" },
-  { name: "Navy", hex: "#164A8A" },
-  { name: "Blue", hex: "#4385DC" },
-  { name: "Teal", hex: "#00A4B8" },
-  { name: "Green", hex: "#25816E" },
-  { name: "Orange", hex: "#F28C13" },
-  { name: "Red", hex: "#CA3D4B" },
-];
-
-function TemplatePaper({ template, color, hasHeadshot }) {
-  return (
-    <span className={`ri-template-paper ri-template-paper-${template}`} style={{ "--template-accent": color }} aria-hidden="true">
-      <span className="ri-template-paper-header">
-        {hasHeadshot && <span className="ri-template-avatar">DA</span>}
-        <span className="ri-template-paper-name">DIYA AGARWAL</span>
-        <span className="ri-template-paper-contact">+91 98765 43210 · diya@example.com · linkedin.com/in/diyaagarwal · github.com/diyaagarwal</span>
-      </span>
-      <span className="ri-template-paper-body">
-        {["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-rail"><b>{template === "portfolio" ? "PORTFOLIO" : "SKILLS"}</b><i>Communication</i><i>Data analysis</i><i>Project planning</i><b>{template === "portfolio" ? "TOOLS" : "EDUCATION"}</b><i>Bachelor's degree</i></span>}
-        <span className="ri-template-paper-main">
-          <span className="ri-template-paper-section">
-            <b>PROFESSIONAL SUMMARY</b>
-            <i>Customer-focused operations professional with 4+ years of experience coordinating daily business activities, supporting cross-functional teams and improving service delivery. Recognized for clear communication, accurate reporting and a practical approach to solving customer and process challenges.</i>
-          </span>
-          {!["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-section">
-            <b>CORE SKILLS</b>
-            <i>Operations coordination · Customer service · Process improvement · Data reporting · Microsoft Excel · Project support · Documentation · Team collaboration · Scheduling · Problem solving</i>
-          </span>}
-          <span className="ri-template-paper-section">
-            <b>PROFESSIONAL EXPERIENCE</b>
-            <strong>Operations Associate · Northstar Services <small>2023 – Present</small></strong>
-            <i>• Coordinate daily service requests and track work across a team of 12 associates.</i>
-            <i>• Prepare weekly Excel reports, verify records and share progress with team leads.</i>
-            <i>• Updated the handover checklist to make shift transitions more consistent.</i>
-            <strong>Customer Support Coordinator · Cedar & Co. <small>2021 – 2023</small></strong>
-            <i>• Responded to customer enquiries and documented requests through resolution.</i>
-            <i>• Worked with billing and fulfilment teams to resolve order issues on time.</i>
-          </span>
-          <span className="ri-template-paper-section">
-            <b>SELECTED PROJECTS</b>
-            <strong>Service Insights Dashboard</strong>
-            <i>Built an Excel dashboard to track request volume, response time and monthly trends.</i>
-            <strong>Team Handover Toolkit</strong>
-            <i>Created shared checklists and reference notes for recurring support workflows.</i>
-          </span>
-          <span className="ri-template-paper-section">
-            <b>EDUCATION</b>
-            <strong>Bachelor of Business Administration</strong>
-            <i>University of Delhi · 2021</i>
-            <strong>Higher Secondary Certificate</strong>
-            <i>Central Public School · 2018</i>
-          </span>
-          {!["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-section">
-            <b>CERTIFICATIONS & LANGUAGES</b>
-            <i>Excel for Business · Customer Experience Foundations</i>
-            <i>English (Professional) · Hindi (Native)</i>
-          </span>}
-        </span>
-      </span>
-    </span>
-  );
-}
-
-function ExperienceEntryEditor({ entries, onChange }) {
-  const addEntry = () => onChange([
-    ...entries,
-    { id: `experience-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${entries.length}`}`, role: "", company: "", startDate: "", endDate: "", description: "" },
-  ]);
-  const updateEntry = (id, field, value) => onChange(entries.map((entry) => entry.id === id ? { ...entry, [field]: value } : entry));
-  const removeEntry = (id) => onChange(entries.filter((entry) => entry.id !== id));
-
-  return (
-    <div className="ri-experience-editor">
-      <div className="ri-experience-editor-heading">
-        <div><strong>Work experience entries</strong><small>Enter your dates here. They will align to the right beside each role in the resume.</small></div>
-        <button type="button" className="secondary-button ri-add-experience" onClick={addEntry}><Plus size={17} aria-hidden="true" /> Add experience</button>
-      </div>
-      {entries.map((entry, index) => (
-        <fieldset className="ri-experience-entry" key={entry.id}>
-          <legend>Experience {String(index + 1).padStart(2, "0")}</legend>
-          <button type="button" className="ri-remove-experience" onClick={() => removeEntry(entry.id)} aria-label={`Remove experience ${index + 1}`} title="Remove this experience"><Trash2 size={16} aria-hidden="true" /></button>
-          <div className="ri-experience-entry-grid">
-            <label>Job title<input value={entry.role || ""} onChange={(event) => updateEntry(entry.id, "role", event.target.value)} placeholder="e.g. Software Engineer" /></label>
-            <label>Company<input value={entry.company || ""} onChange={(event) => updateEntry(entry.id, "company", event.target.value)} placeholder="Company name" /></label>
-            <label>Start year<input inputMode="numeric" value={entry.startDate || ""} onChange={(event) => updateEntry(entry.id, "startDate", event.target.value)} placeholder="e.g. 2022" /></label>
-            <label>End year<input value={entry.endDate || ""} onChange={(event) => updateEntry(entry.id, "endDate", event.target.value)} placeholder="e.g. 2025 or Present" /></label>
-            <label className="ri-grid-full">Responsibilities and outcomes<textarea rows={4} value={entry.description || ""} onChange={(event) => updateEntry(entry.id, "description", event.target.value)} placeholder="Add verified responsibilities or achievements; use one line per item." /></label>
-          </div>
-        </fieldset>
-      ))}
-      {!entries.length && <p className="ri-experience-empty">No structured work history added. Keep using the details field below or add a role.</p>}
-    </div>
-  );
 }
 
 function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
@@ -2081,64 +1135,13 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [showAssist, setShowAssist] = useState(false);
   const [bullet, setBullet] = useState("");
-  const [templateChosen, setTemplateChosen] = useState(false);
-  const template = RESUME_TEMPLATES.some((item) => item.id === profile.template) ? profile.template : "classic";
-  const templateColor = TEMPLATE_COLORS.some((item) => item.hex === profile.templateColor) ? profile.templateColor : TEMPLATE_COLORS[0].hex;
-  const [headshotFilter, setHeadshotFilter] = useState("all");
-  const [graphicsFilter, setGraphicsFilter] = useState("all");
-  const [columnsFilter, setColumnsFilter] = useState("all");
-  const visibleTemplates = RESUME_TEMPLATES.filter((item) =>
-    (headshotFilter === "all" || item.headshot === (headshotFilter === "yes"))
-    && (graphicsFilter === "all" || item.graphics === graphicsFilter)
-    && (columnsFilter === "all" || item.columns === Number(columnsFilter)));
   const sectionKey = (section) => section.startsWith("custom:") ? section : section.toLowerCase();
   const sectionLabel = (section) => section.startsWith("custom:") ? section.slice(7) : section;
-  const secondarySectionNames = new Set(["skills", "education", "certifications", "languages", "training"]);
-  const experienceEntries = Array.isArray(profile.experienceEntries) ? profile.experienceEntries : [];
-  const experienceText = experienceEntries
-    .filter((entry) => [entry.role, entry.company, entry.startDate, entry.endDate, entry.description].some(Boolean))
-    .map((entry) => {
-      const heading = [entry.role, entry.company].filter(Boolean).join(" | ");
-      const dates = [entry.startDate, entry.endDate].filter(Boolean).join(" – ");
-      return `${heading}${dates ? `\t${dates}` : ""}${entry.description ? `\n${entry.description}` : ""}`;
-    }).join("\n\n");
-  const sectionContent = (section) => {
-    const key = sectionKey(section);
-    return key === "experience" ? [profile.experience, experienceText].filter(Boolean).join("\n\n") : profile[key];
-  };
-  const populatedSections = sections
-    .filter((section) => sectionContent(section))
-    .map((section) => ({ id: section, label: sectionLabel(section), content: sectionContent(section) }));
-  const initials = (profile.name || "Your Name").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  const contactItems = [
-    { key: "phone", label: "Phone", value: profile.phone, Icon: Phone },
-    { key: "email", label: "Email", value: profile.email, Icon: Mail },
-    { key: "linkedin", label: "LinkedIn", value: profile.linkedin, Icon: Linkedin },
-    { key: "github", label: "GitHub", value: profile.github, Icon: Github },
-  ].filter((item) => item.value);
-  const renderResumeSections = (items) => items.map((section) => {
-    const isExperience = section.id.toLowerCase() === "experience";
-    return (
-      <section key={section.id}>
-        <h3>{section.label}</h3>
-        {isExperience && experienceEntries.filter((entry) => [entry.role, entry.company, entry.startDate, entry.endDate, entry.description].some(Boolean)).map((entry) => (
-          <div className="ri-resume-experience-entry" key={entry.id}>
-            <div className="ri-resume-experience-heading">
-              <strong>{[entry.role, entry.company].filter(Boolean).join(" | ")}</strong>
-              {(entry.startDate || entry.endDate) && <span>{[entry.startDate, entry.endDate].filter(Boolean).join(" – ")}</span>}
-            </div>
-            {entry.description && <p>{entry.description}</p>}
-          </div>
-        ))}
-        {isExperience ? profile.experience && <p>{profile.experience}</p> : <p>{section.content}</p>}
-      </section>
-    );
-  });
   const fullText = [
     profile.name || "Your Name",
-    contactItems.map(({ label, value }) => `${label}: ${value}`).join("  |  "),
+    profile.email || "",
     profile.headline || "",
-    ...sections.filter((section) => sectionContent(section)).map((section) => `${sectionLabel(section)}\n${sectionContent(section)}`),
+    ...sections.filter((section) => profile[sectionKey(section)]).map((section) => `${sectionLabel(section)}\n${profile[sectionKey(section)]}`),
   ].filter(Boolean).join("\n\n");
   const moveSection = (index, direction) => {
     const next = [...sections];
@@ -2146,10 +1149,6 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
     setSections(next);
-  };
-  const removeSection = (index) => {
-    setSections((current) => current.filter((_, currentIndex) => currentIndex !== index));
-    setDraggedIndex(null);
   };
   const addCustom = () => {
     const label = customSection.trim();
@@ -2161,130 +1160,17 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
     return sentence ? `${sentence}${/[.!?]$/.test(bullet.trim()) ? "" : "."}` : "";
   };
   return (
-    <div className={`ri-builder-layout${templateChosen ? " ri-builder-editing" : " ri-builder-template-select"}`}>
-      {!templateChosen && <fieldset className="ri-template-picker">
-        <legend>Choose a resume template</legend>
-        <h2>Templates we recommend for you</h2>
-        <p className="ri-template-picker-hint">You can always change your template later.</p>
-        <div className="ri-template-filters" aria-label="Filter resume templates">
-          <strong>Filter by</strong>
-          <label><span>Headshot</span><select aria-label="Filter by headshot" value={headshotFilter} onChange={(event) => setHeadshotFilter(event.target.value)}><option value="all">Any headshot</option><option value="yes">With headshot</option><option value="no">Without headshot</option></select></label>
-          <label><span>Graphics</span><select aria-label="Filter by graphics" value={graphicsFilter} onChange={(event) => setGraphicsFilter(event.target.value)}><option value="all">Any graphics</option><option value="None">No graphics</option><option value="Simple">Simple graphics</option><option value="Decorative">Decorative graphics</option></select></label>
-          <label><span>Columns</span><select aria-label="Filter by columns" value={columnsFilter} onChange={(event) => setColumnsFilter(event.target.value)}><option value="all">Any layout</option><option value="1">One column</option><option value="2">Two columns</option></select></label>
-          <div className="ri-template-color-filter">
-            <strong className="ri-template-colors-label">Colors</strong>
-            <div className="ri-template-colors" role="group" aria-label="Template accent color">
-              {TEMPLATE_COLORS.map((color) => <button key={color.hex} type="button" className={`ri-template-color${templateColor === color.hex ? " selected" : ""}`} style={{ "--template-accent": color.hex }} aria-label={`${color.name} accent color`} aria-pressed={templateColor === color.hex} onClick={() => onUpdate("templateColor", color.hex)} />)}
-            </div>
-          </div>
-        </div>
-        <p className="ri-template-count">Showing <strong>{visibleTemplates.length}</strong> templates</p>
-        <div className="ri-template-options">
-          {visibleTemplates.map((item) => (
-            <button key={item.id} type="button" className={`ri-template-option${templateChosen && template === item.id ? " selected" : ""}`} style={{ "--template-accent": templateColor }} aria-pressed={templateChosen && template === item.id} onClick={() => { onUpdate("template", item.id); setTemplateChosen(true); }}>
-              <TemplatePaper template={item.id} color={templateColor} hasHeadshot={item.headshot} />
-              <span className="ri-template-option-copy">
-                <strong>{item.name}</strong>
-                <small>{item.description}</small>
-                <span className="ri-template-option-action">{templateChosen && template === item.id ? <><Check size={15} /> Selected</> : "Choose template"}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-        {!visibleTemplates.length && <div className="ri-template-empty"><p>No templates match these filters.</p><button type="button" className="secondary-button" onClick={() => { setHeadshotFilter("all"); setGraphicsFilter("all"); setColumnsFilter("all"); }}>Clear filters</button></div>}
-      </fieldset>}
-      {templateChosen && <>
+    <div className="ri-builder-layout">
       <section className="ri-card ri-builder-form">
-        <div className="ri-builder-form-heading"><div><h2>Verified resume details</h2><p>Fill in real information. Every section is optional except your name; don't add claims you cannot support.</p></div><button type="button" className="secondary-button" onClick={() => setTemplateChosen(false)}>Change template</button></div>
-        <div className="ri-form-grid">
-          <label>Full name<input value={profile.name || ""} onChange={(event) => onUpdate("name", event.target.value)} /></label>
-          <label>Contact number<input type="tel" autoComplete="tel" value={profile.phone || ""} onChange={(event) => onUpdate("phone", event.target.value)} placeholder="+91 98765 43210" /></label>
-          <label>Email address<input type="email" autoComplete="email" value={profile.email || ""} onChange={(event) => onUpdate("email", event.target.value)} placeholder="you@example.com" /></label>
-          <label>LinkedIn profile<input value={profile.linkedin || ""} onChange={(event) => onUpdate("linkedin", event.target.value)} placeholder="linkedin.com/in/your-name" /></label>
-          <label>GitHub profile<input value={profile.github || ""} onChange={(event) => onUpdate("github", event.target.value)} placeholder="github.com/your-name" /></label>
-          <label className="ri-grid-full">Professional headline<input value={profile.headline || ""} onChange={(event) => onUpdate("headline", event.target.value)} placeholder="e.g. Computer science graduate" /></label>
-        </div>
-        <div className="ri-builder-sections">
-          <h3>Reorder or remove sections</h3>
-          {sections.map((section, index) => (
-            <div
-              key={section}
-              className={`ri-builder-section${draggedIndex === index ? " dragging" : ""}`}
-              draggable
-              onDragStart={() => setDraggedIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
-                if (draggedIndex === null) return;
-                const next = [...sections];
-                const [item] = next.splice(draggedIndex, 1);
-                next.splice(index, 0, item);
-                setSections(next);
-                setDraggedIndex(null);
-              }}
-              onDragEnd={() => setDraggedIndex(null)}
-            >
-              <span className="ri-drag-handle" aria-hidden="true">⠿</span>
-              <div className="ri-builder-section-fields">
-                <label>{sectionLabel(section)}</label>
-                {sectionKey(section) === "experience" && <ExperienceEntryEditor entries={experienceEntries} onChange={(value) => onUpdate("experienceEntries", value)} />}
-                <textarea
-                  rows={3}
-                  value={profile[sectionKey(section)] || ""}
-                  onChange={(event) => onUpdate(sectionKey(section), event.target.value)}
-                  placeholder={sectionKey(section) === "experience" ? "Keep legacy or imported experience details here; these are preserved as entered." : `Add verified ${sectionLabel(section).toLowerCase()} details…`}
-                  aria-label={`${sectionLabel(section)} details`}
-                />
-              </div>
-              <div className="ri-section-actions">
-                <div className="ri-reorder-buttons">
-                  <button type="button" onClick={() => moveSection(index, -1)} aria-label={`Move ${sectionLabel(section)} up`} title="Move up">↑</button>
-                  <button type="button" onClick={() => moveSection(index, 1)} aria-label={`Move ${sectionLabel(section)} down`} title="Move down">↓</button>
-                </div>
-                <button
-                  type="button"
-                  className="ri-delete-section"
-                  onClick={() => removeSection(index)}
-                  aria-label={`Remove ${sectionLabel(section)} section from this resume`}
-                  title="Remove section from resume"
-                >
-                  <Trash2 size={15} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          ))}
-          {!sections.length && <p className="ri-experience-empty">All sections are removed. Add a section name below to continue.</p>}
-        </div>
+        <h2>Verified resume details</h2><p>Fill in real information. Every section is optional except your name; don't add claims you cannot support.</p>
+        <div className="ri-form-grid"><label>Full name<input value={profile.name || ""} onChange={(event) => onUpdate("name", event.target.value)} /></label><label>Email<input type="email" value={profile.email || ""} onChange={(event) => onUpdate("email", event.target.value)} /></label><label className="ri-grid-full">Professional headline<input value={profile.headline || ""} onChange={(event) => onUpdate("headline", event.target.value)} placeholder="e.g. Computer science graduate" /></label></div>
+        <div className="ri-builder-sections"><h3>Reorder sections</h3>{sections.map((section, index) => <div key={section} className={`ri-builder-section${draggedIndex === index ? " dragging" : ""}`} draggable onDragStart={() => setDraggedIndex(index)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (draggedIndex === null) return; const next = [...sections]; const [item] = next.splice(draggedIndex, 1); next.splice(index, 0, item); setSections(next); setDraggedIndex(null); }} onDragEnd={() => setDraggedIndex(null)}><span className="ri-drag-handle">⠿</span><label>{sectionLabel(section)}<textarea rows={3} value={profile[sectionKey(section)] || ""} onChange={(event) => onUpdate(sectionKey(section), event.target.value)} placeholder={`Add verified ${sectionLabel(section).toLowerCase()} details…`} /></label><div className="ri-reorder-buttons"><button type="button" onClick={() => moveSection(index, -1)} aria-label={`Move ${sectionLabel(section)} up`}>↑</button><button type="button" onClick={() => moveSection(index, 1)} aria-label={`Move ${sectionLabel(section)} down`}>↓</button></div></div>)}</div>
         <div className="ri-inline-form"><input value={customSection} onChange={(event) => setCustomSection(event.target.value)} placeholder="Custom section name" /><button type="button" className="secondary-button" onClick={addCustom}>Add section</button></div>
         <button type="button" className="secondary-button" onClick={() => setShowAssist((value) => !value)}><Lightbulb size={16} /> Writing assistant</button>
         {showAssist && <div className="ri-assist"><p>Paste a real bullet and we can format its punctuation. This local helper does not generate new achievements or facts.</p><textarea className="ri-textarea" rows={3} value={bullet} onChange={(event) => setBullet(event.target.value)} placeholder="Describe what you actually did…" />{bullet && <p><strong>Formatted draft:</strong> {rewriteBullet()}</p>}</div>}
-        <div className="ri-builder-actions"><button type="button" className="primary-button" onClick={() => onBuilt(fullText)}>Save resume text <Check size={15} /></button><button type="button" className="secondary-button" onClick={() => onExport("pdf", fullText, template, SECTIONS, templateColor)}><Download size={15} /> Print / Save PDF</button><button type="button" className="secondary-button" onClick={() => onExport("docx", fullText, template, sections.map(sectionLabel), templateColor)}><Download size={15} /> Export DOCX</button></div>
+        <div className="ri-builder-actions"><button type="button" className="primary-button" onClick={() => onBuilt(fullText)}>Save resume text <Check size={15} /></button><button type="button" className="secondary-button" onClick={() => onExport("pdf", fullText)}><Download size={15} /> Print / Save PDF</button><button type="button" className="secondary-button" onClick={() => onExport("docx", fullText)}><Download size={15} /> Export DOCX</button></div>
       </section>
-      <aside className={`ri-card ri-live-preview ri-template-${template}`} style={{ "--template-accent": templateColor }}>
-        <span className="eyebrow">LIVE PREVIEW · {RESUME_TEMPLATES.find((item) => item.id === template)?.name.toUpperCase()}</span>
-        <article className={`ri-resume-document ri-resume-document-${template}`}>
-          <header className="ri-resume-document-header">
-            {(template === "modern" || template === "executive" || template === "sidebar") && <span className="ri-resume-avatar" aria-hidden="true">{initials}</span>}
-            <div>
-              <h2>{profile.name || "Your Name"}</h2>
-              {profile.headline && <p className="ri-resume-headline">{profile.headline}</p>}
-              <div className="ri-resume-contacts" aria-label="Resume contact information">
-                {contactItems.map(({ key, label, value, Icon }) => <span key={key}><Icon size={13} aria-hidden="true" /><b>{label}:</b> {value}</span>)}
-                {!contactItems.length && <span className="ri-resume-contact-empty">Add your phone, email, LinkedIn and GitHub in the form.</span>}
-              </div>
-            </div>
-          </header>
-          {["sidebar", "split", "portfolio"].includes(template) ? (
-            <div className="ri-resume-document-columns">
-              <div className="ri-resume-document-rail">{renderResumeSections(populatedSections.filter((section) => template === "portfolio" ? ["projects", "certifications"].includes(section.label.toLowerCase()) : secondarySectionNames.has(section.label.toLowerCase())))}</div>
-              <div className="ri-resume-document-main">{renderResumeSections(populatedSections.filter((section) => template === "portfolio" ? !["projects", "certifications"].includes(section.label.toLowerCase()) : !secondarySectionNames.has(section.label.toLowerCase())))}</div>
-            </div>
-          ) : (
-            <div className="ri-resume-document-main">{renderResumeSections(populatedSections)}</div>
-          )}
-          {!populatedSections.length && <p className="ri-disclaimer">Complete sections in the editor to build your preview.</p>}
-        </article>
-      </aside>
-      </>}
+      <aside className="ri-card ri-live-preview"><span className="eyebrow">LIVE PREVIEW · SINGLE-COLUMN TEMPLATE</span><h2>{profile.name || "Your Name"}</h2><p>{profile.headline || profile.email || "Professional headline · Email address"}</p>{sections.map((section) => profile[sectionKey(section)] && <section key={section}><h3>{sectionLabel(section)}</h3><p>{profile[sectionKey(section)]}</p></section>)}{!sections.some((section) => profile[sectionKey(section)]) && <p className="ri-disclaimer">Complete sections in the editor to build your preview.</p>}</aside>
     </div>
   );
 }
