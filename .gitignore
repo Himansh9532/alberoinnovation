@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.vercel/
 .aws-sam/
 .env
 .env.*
