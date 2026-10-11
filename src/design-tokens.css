@@ -1,0 +1,46 @@
+:root {
+  --bg-page: #E7EFDF;
+  --surface: #FFFFFF;
+  --ink: #1B2A22;
+  --muted: #4B5563;
+  --accent: #A8401A;
+  --border: #CFDCC3;
+  --track: #E3EBDB;
+  --label: #4A6A8F;
+  --nav-hover: #F6F4EF;
+  --nav-active-bg: #F8EEE8;
+  --ai-bg: #FBF4EF;
+  --ai-border: #EBD8CC;
+  --success: #14703F;
+  --warning: #B45309;
+  --danger: #B42318;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-size-base: 15px;
+  --radius: 6px;
+  --radius-pill: 99px;
+  --sidebar-width: 256px;
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+
+  --bg: var(--bg-page);
+  --bg-soft: var(--bg-page);
+  --surface-strong: var(--surface);
+  --surface-muted: var(--track);
+  --text: var(--ink);
+  --text-soft: var(--muted);
+  --text-muted: var(--muted);
+  --brand: var(--accent);
+  --brand-hover: var(--accent);
+  --brand-soft: var(--ai-bg);
+  --indigo: var(--accent);
+  --indigo-soft: var(--ai-bg);
+  --teal: var(--accent);
+  --teal-soft: var(--ai-bg);
+  --shadow: none;
+  --shadow-soft: none;
+  --radius-lg: var(--radius);
+  --radius-md: var(--radius);
+  --radius-sm: var(--radius);
+  --font-sans: var(--font-body);
+}
