@@ -44,17 +44,28 @@ For deployment, add `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) as server-s
 
 ### AWS static frontend and separate API backend
 
-The frontend is a static Vite site for **Amazon S3 + CloudFront**; the Node API runs separately on **AWS Lambda + API Gateway**. `template.yaml` defines the API routes, CORS, and Lambda deployment. Install/configure the AWS CLI and AWS SAM CLI with deployment permissions in your AWS account first.
+The frontend and backend are deployed as separate AWS services: the static frontend is stored in a private **Amazon S3** bucket and delivered through **CloudFront**, while API requests run independently on **AWS Lambda + API Gateway**. Static page and asset traffic is served by CloudFront instead of occupying API compute. `template.yaml` provisions both sides with separate resources; the frontend output is the generated `dist/` folder.
 
-1. Create an S3 bucket for the static site and a CloudFront distribution with Origin Access Control to that bucket. Set CloudFront's 403 and 404 custom error responses to serve `/index.html` with response code 200 so React Router routes work.
-2. Create a Secrets Manager secret named `robotics-lab/backend`. Use a JSON object with `GEMINI_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_BASE64`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `ADZUNA_APP_ID`, and `ADZUNA_APP_KEY`. Keep secret values in AWS only; use empty values for optional Razorpay/Adzuna credentials you have not configured.
-3. Verify the SES sender email/domain in the Lambda's AWS region and request production access if the SES account is still in its sandbox. While sandboxed, verify both the business recipient and each customer recipient. Local development uses the AWS SDK credential chain and the configured local AWS profile.
-4. From the repository root, run `sam build`, then `sam deploy --guided`. For `FrontendOrigin`, enter the exact CloudFront origin, such as `https://d123example.cloudfront.net` (no trailing slash). Keep the default secret name if used, set `SesFromEmail` to the verified sender, and set `PaymentReceiptAdminEmail` to the business recipient. The Lambda role is granted `ses:SendEmail` only for that sender identity.
-5. After deployment, copy the `BackendApiUrl` stack output. Set `VITE_API_BASE_URL` to that URL and set the `VITE_FIREBASE_*` web app settings in the frontend build environment. Run `npm run build`, upload the contents of `dist/` to S3, then invalidate the CloudFront cache.
+Install and configure the AWS CLI and AWS SAM CLI with permissions to create S3, CloudFront, API Gateway, Lambda, IAM, and related resources in your AWS account. CloudFront distribution creation can take several minutes.
 
-The Lambda receives backend-only credentials from Secrets Manager; never place these in frontend variables or upload them to S3. Update the `FrontendOrigin` parameter and redeploy the SAM stack if the CloudFront origin changes. After rotating a secret, redeploy the stack so Lambda's environment picks up the new secret value.
+1. Create a Secrets Manager secret named `robotics-lab/backend`. Use a JSON object with `GEMINI_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_BASE64`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `ADZUNA_APP_ID`, and `ADZUNA_APP_KEY`. Keep secret values in AWS only; use empty values for optional Razorpay/Adzuna credentials you have not configured.
+2. Verify the SES sender email/domain in the Lambda's AWS region and request production access if the SES account is still in its sandbox. While sandboxed, verify both the business recipient and each customer recipient. Local development uses the AWS SDK credential chain and the configured local AWS profile.
+3. From the repository root, run `sam build`, then `sam deploy --guided`. Keep the default secret name if used, set `SesFromEmail` to the verified sender, and set `PaymentReceiptAdminEmail` to the business recipient. The stack creates a private, encrypted S3 bucket, a CloudFront distribution with private bucket access and SPA route fallback, and the API Gateway/Lambda backend. API CORS is restricted to the generated CloudFront origin. The Lambda role is granted `ses:SendEmail` only for the configured sender identity.
+4. After deployment, read the `BackendApiUrl`, `FrontendBucketName`, `FrontendDistributionId`, and `FrontendUrl` stack outputs. Set `VITE_API_BASE_URL` to `BackendApiUrl` and configure the browser-safe `VITE_FIREBASE_*` settings in the frontend build environment. Do not put backend credentials in frontend variables.
+5. Build and upload the frontend from PowerShell:
 
-For local development, the frontend and backend use separate terminals and env files: root `.env.local` for browser-safe frontend values and `backend/.env` for server-only credentials.
+   ```powershell
+   $env:VITE_API_BASE_URL = "<BackendApiUrl>"
+   npm run build
+   aws s3 sync .\dist\ s3://<FrontendBucketName> --delete
+   aws cloudfront create-invalidation --distribution-id <FrontendDistributionId> --paths "/*"
+   ```
+
+   `npm run build` creates the `dist/` folder; upload its contents, not the folder itself. Open `FrontendUrl` after the CloudFront deployment is complete.
+
+The Lambda receives backend-only credentials from Secrets Manager; never place these in frontend variables or upload them to S3. After rotating a secret, redeploy the SAM stack so Lambda's environment picks up the new secret value.
+
+For local development, the frontend and backend can still run in separate terminals with separate env files: root `.env.local` for browser-safe frontend values and `backend/.env` for server-only credentials.
 
 ### Search engine setup
 

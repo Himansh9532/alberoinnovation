@@ -3,9 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Robotics STEM Lab API backend
 
 Parameters:
-  FrontendOrigin:
-    Type: String
-    Description: Exact HTTPS origin of the CloudFront frontend, without a trailing slash or path.
   GeminiModel:
     Type: String
     Default: gemini-3.5-flash
@@ -31,7 +28,7 @@ Globals:
       - x86_64
     Environment:
       Variables:
-        CORS_ALLOWED_ORIGINS: !Ref FrontendOrigin
+        CORS_ALLOWED_ORIGINS: !Sub "https://${FrontendDistribution.DomainName}"
         GEMINI_MODEL: !Ref GeminiModel
         SES_FROM_EMAIL: !Ref SesFromEmail
         PAYMENT_RECEIPT_ADMIN_EMAIL: !Ref PaymentReceiptAdminEmail
@@ -44,13 +41,96 @@ Globals:
         ADZUNA_APP_KEY: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADZUNA_APP_KEY}}"
 
 Resources:
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FrontendOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-frontend-oac"
+        Description: Private access from CloudFront to the frontend bucket.
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: FrontendS3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt FrontendOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: FrontendS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
+
   BackendHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: $default
       CorsConfiguration:
         AllowOrigins:
-          - !Ref FrontendOrigin
+          - !Sub "https://${FrontendDistribution.DomainName}"
         AllowHeaders:
           - Authorization
           - Content-Type
@@ -97,6 +177,12 @@ Resources:
             ApiId: !Ref BackendHttpApi
             Path: /api/research-assistant
             Method: POST
+        ResumeAssistant:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/resume-assistant
+            Method: POST
         BillingUsage:
           Type: HttpApi
           Properties:
@@ -136,6 +222,15 @@ Resources:
           - .js=.mjs
 
 Outputs:
+  FrontendUrl:
+    Description: CloudFront URL for the static frontend.
+    Value: !Sub "https://${FrontendDistribution.DomainName}"
+  FrontendBucketName:
+    Description: Private S3 bucket for the built frontend files.
+    Value: !Ref FrontendBucket
+  FrontendDistributionId:
+    Description: CloudFront distribution ID for cache invalidations.
+    Value: !Ref FrontendDistribution
   BackendApiUrl:
     Description: API Gateway endpoint for the backend.
     Value: !Sub "https://${BackendHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
