@@ -15759,3 +15759,143 @@ html[data-theme="dark"] .ri-analyzer-stats-empty svg {
     gap: 7px;
   }
 }
+.admin-page {
+  min-height: 100vh;
+  padding: clamp(2rem, 5vw, 4rem) 1.25rem;
+  background: var(--surface-subtle, #f5f7f6);
+  color: var(--text-primary, #1d2925);
+}
+
+.admin-login-card,
+.admin-content {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+}
+
+.admin-login-card {
+  max-width: 440px;
+  padding: 2rem;
+  border: 1px solid var(--border, #dce5e0);
+  border-radius: 1rem;
+  background: var(--surface, #fff);
+  box-shadow: 0 16px 48px rgb(20 45 35 / 8%);
+}
+
+.admin-icon {
+  display: inline-flex;
+  margin-bottom: 1rem;
+  color: var(--brand-primary, #246b50);
+}
+
+.admin-login-card h1,
+.admin-header h1 {
+  margin: 0;
+}
+
+.admin-login-card > p:not(.eyebrow),
+.admin-header > div > p:not(.eyebrow) {
+  color: var(--text-secondary, #60706a);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.admin-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-stat-card,
+.admin-users {
+  padding: 1.25rem;
+  border: 1px solid var(--border, #dce5e0);
+  border-radius: 0.875rem;
+  background: var(--surface, #fff);
+}
+
+.admin-stat-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-stat-card > svg {
+  color: var(--brand-primary, #246b50);
+}
+
+.admin-stat-card > span,
+.admin-users-heading p {
+  color: var(--text-secondary, #60706a);
+}
+
+.admin-stat-card > strong {
+  font-size: 1.75rem;
+}
+
+.admin-users-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-users-heading h2,
+.admin-users-heading p {
+  margin: 0.2rem 0;
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-table-scroll th,
+.admin-table-scroll td {
+  padding: 0.8rem 0.65rem;
+  border-bottom: 1px solid var(--border, #dce5e0);
+  white-space: nowrap;
+}
+
+.admin-table-scroll th {
+  color: var(--text-secondary, #60706a);
+  font-size: 0.8rem;
+}
+
+.admin-empty {
+  color: var(--text-secondary, #60706a);
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .admin-header {
+    flex-direction: column;
+  }
+
+  .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}

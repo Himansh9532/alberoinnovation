@@ -2,14 +2,14 @@
 
 The local API is served at `http://localhost:3001`; in production, API Gateway supplies the base URL. The browser constructs requests through `frontend/src/services/api-client.js`.
 
-Except for `GET /health`, account-specific routes require:
+Firebase-authenticated routes require a Firebase ID token:
 
 ```http
 Authorization: Bearer <Firebase ID token>
 Content-Type: application/json
 ```
 
-The backend verifies Firebase ID tokens. Client-side route guards are for navigation only and are not a substitute for API authorization.
+The backend verifies Firebase ID tokens for account-specific operations. Admin login uses the separately configured admin credentials, and admin statistics require the resulting admin session rather than a Firebase token. Client-side route guards are for navigation only and are not a substitute for API authorization.
 
 ## Endpoints
 
@@ -20,6 +20,12 @@ The backend verifies Firebase ID tokens. Client-side route guards are for naviga
 | `POST /api/skill-assessment` | Firebase | Generate a 20-question assessment or evaluate its answers. |
 | `POST /api/research-assistant` | Firebase | Summarize a paper abstract or answer a question about it. |
 | `POST /api/resume-assistant` | Firebase | Analyze, tailor, compare, or assess skills from resume text. |
+| `POST /api/users/profile` | Firebase | Save or update the signed-in user's profile metadata. |
+| `GET /api/users/resume` | Firebase | Read the signed-in user's saved extracted resume text. |
+| `PUT /api/users/resume` | Firebase | Save or replace the signed-in user's extracted resume text. |
+| `DELETE /api/users/resume` | Firebase | Delete the signed-in user's saved extracted resume text. |
+| `POST /api/admin/login` | Admin credentials | Create an admin session. |
+| `GET /api/admin/stats` | Admin session | Read aggregate account, sign-in, and resume-storage statistics and user metadata. |
 | `GET /api/billing/usage` | Firebase | Read current plan and monthly usage. |
 | `POST /api/billing/order` | Firebase | Create a Razorpay order for a supported paid plan. |
 | `POST /api/billing/verify-payment` | Firebase | Verify a captured Razorpay payment and activate the associated plan. |

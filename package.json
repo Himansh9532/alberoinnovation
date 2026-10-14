@@ -7,6 +7,7 @@
     "dev:web": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
+    "admin:hash-password": "npm --prefix backend run admin:hash-password",
     "test": "node --test backend/src/*.test.js backend/src/modules/*/*.test.js shared/*.test.js frontend/src/services/*.test.js frontend/src/features/*/services/*.test.js",
     "preview": "npm --prefix frontend run preview",
     "start:api": "npm --prefix backend start",

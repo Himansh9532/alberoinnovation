@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Robotics STEM Lab API backend
+Description: Albero Innovation API backend
 
 Parameters:
   GeminiModel:
@@ -8,7 +8,7 @@ Parameters:
     Default: gemini-3.5-flash
   BackendSecretsName:
     Type: String
-    Default: robotics-lab/backend
+    Default: albero-innovation/backend
     Description: Name or ARN of the Secrets Manager secret containing the backend credentials.
   SesFromEmail:
     Type: String
@@ -20,7 +20,7 @@ Parameters:
     Description: Business email address that receives a blind copy of payment receipts.
   FrontendDomainName:
     Type: String
-    Default: alberoinnovation.com
+    Default: albero-innovation.in
     Description: Custom frontend domain name covered by the CloudFront certificate.
   FrontendCertificateArn:
     Type: String
@@ -53,6 +53,9 @@ Globals:
         RAZORPAY_KEY_SECRET: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:RAZORPAY_KEY_SECRET}}"
         ADZUNA_APP_ID: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADZUNA_APP_ID}}"
         ADZUNA_APP_KEY: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADZUNA_APP_KEY}}"
+        ADMIN_USERNAME: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADMIN_USERNAME}}"
+        ADMIN_PASSWORD_HASH: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADMIN_PASSWORD_HASH}}"
+        ADMIN_SESSION_SECRET: !Sub "{{resolve:secretsmanager:${BackendSecretsName}:SecretString:ADMIN_SESSION_SECRET}}"
 
 Resources:
   FrontendBucket:
@@ -178,6 +181,8 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PUT
+          - DELETE
           - OPTIONS
         MaxAge: 600
 
@@ -224,6 +229,42 @@ Resources:
             ApiId: !Ref BackendHttpApi
             Path: /api/resume-assistant
             Method: POST
+        SaveUserProfile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/users/profile
+            Method: POST
+        UserResume:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/users/resume
+            Method: GET
+        SaveUserResume:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/users/resume
+            Method: PUT
+        DeleteUserResume:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/users/resume
+            Method: DELETE
+        AdminLogin:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/admin/login
+            Method: POST
+        AdminStats:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/admin/stats
+            Method: GET
         BillingUsage:
           Type: HttpApi
           Properties:

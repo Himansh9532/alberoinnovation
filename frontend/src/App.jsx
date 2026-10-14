@@ -52,6 +52,7 @@ import { academicPaths } from "./data/academic-paths";
 import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../../shared/plan-pricing.js";
 import { SEO_IMAGE_URL, SEO_PAGES, SEO_SITE_URL } from "../../shared/seo-pages.js";
 import { AppShell, Sidebar } from "./components/layout/ui.jsx";
+import AdminPage from "./features/admin/AdminPage.jsx";
 
 const InterviewExperiencePage = lazy(() => import("./features/interview/components/InterviewExperience"));
 const SkillAssessmentPage = lazy(() => import("./features/assessment/components/SkillAssessment"));
@@ -68,11 +69,21 @@ const RESEARCH_LIBRARY_KEY = "skillai-research-library";
 const RESEARCH_LIBRARY_LIMIT = 200;
 const REMOVED_ZENODO_DOIS = new Set(["10.5281/zenodo.7414343"]);
 
+async function saveUserProfile(user) {
+  if (user.authProvider === "firebase") {
+    const response = await apiRequest("/api/users/profile", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Your account profile could not be saved.");
+    }
+  }
+}
+
 function getSeoPage(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (SEO_PAGES[path]) return { ...SEO_PAGES[path], indexable: true, path };
 
-  const privatePage = ["/login", "/register", "/dashboard", "/interview/start", "/assessment/start"]
+  const privatePage = ["/login", "/register", "/dashboard", "/interview/start", "/assessment/start", "/admin"]
     .includes(path) || path === "/resume" || path.startsWith("/resume/");
   return {
     title: privatePage ? "Your SkillAI Workspace" : "Page Not Found | SkillAI",
@@ -584,7 +595,7 @@ const FEATURE_LANDING_PAGES = {
       ["Choose a visual template", "Preview six optional photo-ready styles, adjust the accent color, and reorder sections."],
       ["Export on your device", "Review the finished preview, then print to PDF or download a Word document."],
     ],
-    privacy: "Resume text and an optional profile photo stay in this browser unless you choose an AI feature. The resume builder itself does not send your photo to AI.",
+    privacy: "Resume text is stored in your account and an optional profile photo stays in this browser. Resume text is sent to an AI service only when you choose an AI feature; the builder does not send your photo to AI.",
     related: [{ to: "/jd-match", label: "Match a resume to a job description" }, { to: "/ai-interview", label: "Practice for an interview" }],
   },
   "/ai-interview": {
@@ -632,7 +643,7 @@ const FEATURE_LANDING_PAGES = {
       ["Keep the job description in one place", "Switch between matching and tailoring without pasting the description again."],
       ["Review before using AI", "Resume tailoring is optional; check every draft against your real experience before downloading."],
     ],
-    privacy: "The initial text comparison runs locally. Resume text and job description are sent to the AI provider only if you choose the tailoring action.",
+    privacy: "The initial text comparison runs locally. Resume text is stored in your account and sent to the AI provider only if you choose the tailoring action.",
     related: [{ to: "/resume-builder", label: "Build or edit your resume" }, { to: "/ai-interview", label: "Practice for the job interview" }],
   },
 };
@@ -793,7 +804,7 @@ function ResumePage() {
       </section>
       <div className="resume-tools-privacy">
         <strong>Your resume stays yours.</strong>
-        <p>The original file is not uploaded or stored by SkillAI. Extracted text is sent to the AI service only after you give consent in the interview setup.</p>
+        <p>The original file stays on your device. Extracted resume text is saved to your account; it is sent to an AI service only after you give consent in the relevant feature.</p>
       </div>
     </StandardPage>
   );
@@ -2566,12 +2577,12 @@ function RegisterPage({ onLogin }) {
   );
 }
 
-function AccountDataConsentPage({ user, error, onAccept, onDecline }) {
+function AccountDataConsentPage({ user, error, isSavingProfile, onAccept, onDecline }) {
   const [accepted, setAccepted] = useState(false);
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (accepted) onAccept();
+    if (accepted && !isSavingProfile) void onAccept();
   };
 
   return (
@@ -2581,10 +2592,10 @@ function AccountDataConsentPage({ user, error, onAccept, onDecline }) {
           <div className="auth-heading">
             <span className="eyebrow">Privacy and data use</span>
             <h1 id="data-consent-title">Before you continue</h1>
-            <p className="auth-copy">{user.name ? `Welcome, ${user.name}. ` : ""}SkillAI uses your name and email to provide your account and personalize your workspace.</p>
+            <p className="auth-copy">{user.name ? `Welcome, ${user.name}. ` : ""}SkillAI uses your name and email to provide your account and personalize your workspace. Resume text you upload is saved to your account so you can access it on another device.</p>
           </div>
           <div className="account-data-consent-details">
-            <p>Your account data is not made public to other users.</p>
+            <p>Your account data is not made public to other users. The admin dashboard displays account activity and resume storage size, not resume contents.</p>
             <p>When you choose an AI feature, text you submit (such as a resume or answer) may be sent to the AI provider to generate your requested result. Those features show their own consent before sending text.</p>
           </div>
           <form className="auth-form" onSubmit={handleSubmit}>
@@ -2593,9 +2604,9 @@ function AccountDataConsentPage({ user, error, onAccept, onDecline }) {
               <span>I understand and agree to this use of my account data and any text I choose to submit to AI features.</span>
             </label>
             {error && <div className="auth-error" role="alert">{error}</div>}
-            <button type="submit" className="primary-button auth-submit" disabled={!accepted}>Accept and continue <ArrowRight size={16} /></button>
+            <button type="submit" className="primary-button auth-submit" disabled={!accepted || isSavingProfile}>{isSavingProfile ? "Saving account..." : "Accept and continue"} {!isSavingProfile && <ArrowRight size={16} />}</button>
           </form>
-          <button type="button" className="text-link account-data-consent-decline" onClick={onDecline}>Decline and sign out</button>
+          <button type="button" className="text-link account-data-consent-decline" onClick={onDecline} disabled={isSavingProfile}>Decline and sign out</button>
         </section>
       </div>
     </main>
@@ -2802,6 +2813,7 @@ function App() {
   });
   const [pendingUser, setPendingUser] = useState(null);
   const [consentError, setConsentError] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [postConsentPath, setPostConsentPath] = useState("/dashboard");
 
   useEffect(() => {
@@ -2890,17 +2902,26 @@ function App() {
     setPendingUser(user);
     navigate("/consent", { replace: true });
   };
-  const handleConsentAccept = () => {
-    if (!pendingUser) return;
-    setSession({
-      id: pendingUser.id,
-      name: pendingUser.name,
-      email: pendingUser.email,
-      role: pendingUser.role,
-      authProvider: pendingUser.authProvider,
-    });
-    setPendingUser(null);
-    navigate(postConsentPath, { replace: true });
+  const handleConsentAccept = async () => {
+    if (!pendingUser || isSavingProfile) return;
+    setConsentError("");
+    setIsSavingProfile(true);
+    try {
+      await saveUserProfile(pendingUser);
+      setSession({
+        id: pendingUser.id,
+        name: pendingUser.name,
+        email: pendingUser.email,
+        role: pendingUser.role,
+        authProvider: pendingUser.authProvider,
+      });
+      setPendingUser(null);
+      navigate(postConsentPath, { replace: true });
+    } catch (error) {
+      setConsentError(error.message || "Your account profile could not be saved.");
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
   const handleConsentDecline = async () => {
     try {
@@ -2920,6 +2941,8 @@ function App() {
     && !location.state.from.startsWith("//")
     ? location.state.from
     : "/dashboard";
+  if (location.pathname === "/admin") return <AdminPage />;
+
   const resumePage = (
     <Suspense fallback={<main className="page-shell ri-page"><div className="wrap ri-route-loading" role="status" aria-live="polite"><LoaderCircle size={20} aria-hidden="true" /> Opening your resume workspace…</div></main>}>
       <ResumeIntelligence key={session?.id} user={session} />
@@ -2959,7 +2982,7 @@ function App() {
           <Route path="/resources" element={requireSession(<ResourcesPage />)} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/pricing" element={<PricingPage user={session} onLogout={handleLogout} />} />
-          <Route path="/consent" element={pendingUser ? <AccountDataConsentPage user={pendingUser} error={consentError} onAccept={handleConsentAccept} onDecline={() => void handleConsentDecline()} /> : <Navigate to="/login" replace />} />
+          <Route path="/consent" element={pendingUser ? <AccountDataConsentPage user={pendingUser} error={consentError} isSavingProfile={isSavingProfile} onAccept={handleConsentAccept} onDecline={() => void handleConsentDecline()} /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={session ? <Navigate to={requestedPath} replace /> : <LoginPage onLogin={handleLogin} />} />
           <Route path="/register" element={session ? <Navigate to={requestedPath} replace /> : <RegisterPage onLogin={handleLogin} />} />
           <Route path="/dashboard" element={requireSession(<DashboardPage user={session} />)} />

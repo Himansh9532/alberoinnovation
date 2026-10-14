@@ -1,8 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getFirebaseAdmin } from "../../firebase-admin.js";
 import { handleCors } from "../../middleware/cors.js";
 import { addCalendarMonths, getPlanPricePaise } from "../../../../shared/plan-pricing.js";
 
@@ -51,39 +50,6 @@ function readRequestBody(body) {
   } catch {
     throw createHttpError(400, "Request body must be valid JSON.", "INVALID_JSON");
   }
-}
-
-function getFirebaseAdmin() {
-  const encodedCredential = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-  const credentialJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-    || (encodedCredential ? Buffer.from(encodedCredential, "base64").toString("utf8") : "");
-  if (!credentialJson) {
-    throw createHttpError(503, "Plan and payment services are not configured. Add Firebase Admin credentials to the server environment.", "BILLING_NOT_CONFIGURED");
-  }
-
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(credentialJson);
-  } catch {
-    throw createHttpError(503, "Firebase Admin credentials are not valid JSON.", "BILLING_NOT_CONFIGURED");
-  }
-  if (typeof serviceAccount.private_key === "string") {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
-  }
-
-  const projectId = process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id;
-  if (!projectId || !serviceAccount.client_email || !serviceAccount.private_key) {
-    throw createHttpError(503, "Firebase Admin credentials are incomplete.", "BILLING_NOT_CONFIGURED");
-  }
-
-  const app = getApps()[0] || initializeApp({
-    credential: cert(serviceAccount),
-    projectId,
-  });
-  return {
-    auth: getAuth(app),
-    db: getFirestore(app),
-  };
 }
 
 export async function authenticateRequest(request) {

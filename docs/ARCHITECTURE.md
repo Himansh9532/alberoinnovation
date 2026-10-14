@@ -2,7 +2,7 @@
 
 ## Overview
 
-SkillAI is a JavaScript application with a React/Vite browser client and a Node.js API. The same API handlers are exposed through a local HTTP server and an AWS Lambda adapter. Firebase Authentication identifies users; Firebase Admin and Firestore enforce server-side plan usage and persist billing records.
+SkillAI is a JavaScript application with a React/Vite browser client and a Node.js API. The same API handlers are exposed through a local HTTP server and an AWS Lambda adapter. Firebase Authentication identifies users; Firebase Admin and Firestore persist user profiles and private resume text, enforce server-side plan usage, and store billing records. A separate environment-configured administrator login provides aggregate usage metrics.
 
 ```text
 Browser
@@ -41,11 +41,13 @@ API deployment: backend/src/lambda.js -> AWS Lambda -> API Gateway
 
 1. The browser signs users in through Firebase Authentication. Browser Firebase settings use `VITE_FIREBASE_*` variables; they are not server credentials.
 2. The client obtains a Firebase ID token and sends it as a bearer token for account-specific AI, plan, job-search, and billing operations.
-3. Backend handlers validate payloads and verify Firebase tokens with Firebase Admin. Plan usage is charged transactionally in Firestore before paid AI work proceeds.
+3. Backend handlers validate payloads and verify Firebase tokens with Firebase Admin. Successful Firebase sign-ins save or update `users/{uid}` with the account email, display name, sign-in providers, login count, and login timestamps; passwords are never copied to Firestore. Extracted resume text is stored at `users/{uid}/resumes/current` and can only be read or changed through a Firebase-authenticated backend request for that UID. Plan usage is charged transactionally in Firestore before paid AI work proceeds.
 4. AI handlers call Gemini from the backend. Interview and assessment flows submit resume or answer text; the research assistant submits paper metadata, abstract, and optional short conversation. Resume features send resume and, for tailoring, job-description text. These requests are made only when the relevant feature is used.
 5. Billing creates and verifies Razorpay orders server-side, activates plans in Firestore after checking captured payment details, and attempts receipt delivery through SES.
 6. India job listings are fetched server-side from Adzuna. Other public job feeds are handled by the resume feature in the browser.
-7. Resume and research-library data are browser-local as described in the README; plan and payment state are server-side.
+7. Firebase users' extracted resume text, profile metadata, plan and payment state are server-side. Builder/profile snapshots and research-library data remain browser-local as described in the README.
+
+The `/admin` page uses an independent username/password credential stored as a server-side scrypt hash. Admin sessions are HMAC-signed and expire after eight hours. The protected statistics endpoint reports account count, recorded sign-in count, total resume-text bytes, and recent account metadata; it does not return resume contents. Admin credentials are configured in the backend environment or the deployment Secrets Manager secret, never in browser settings.
 
 ## Environments and deployment
 

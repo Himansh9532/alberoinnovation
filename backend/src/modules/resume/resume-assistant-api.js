@@ -1,5 +1,6 @@
 import { authenticateRequest } from "../billing/billing-api.js";
 import { handleCors } from "../../middleware/cors.js";
+import { setBoundedMapEntry } from "../../middleware/bounded-map.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_RESUME_LENGTH = 12000;
@@ -89,7 +90,7 @@ function isRateLimited(uid) {
   const now = Date.now();
   const current = requestCounts.get(uid);
   if (!current || now - current.startedAt >= RATE_LIMIT_WINDOW_MS) {
-    requestCounts.set(uid, { startedAt: now, count: 1 });
+    setBoundedMapEntry(requestCounts, uid, { startedAt: now, count: 1 });
     return false;
   }
   current.count += 1;

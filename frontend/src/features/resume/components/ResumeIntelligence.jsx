@@ -33,6 +33,7 @@ import { getPhotoBytes, resizeResumePhoto } from "../services/resume-photo.js";
 
 const PROFILE_KEY = "skillai-resume-profile";
 const RESUME_KEY = "skillai-resume-text";
+const RESUME_CLOUD_CONSENT_KEY = "skillai-resume-cloud-consent";
 const JOB_FEED_CACHE_TTL = 60 * 60 * 1000;
 let publicJobFeedCache = null;
 
@@ -99,6 +100,16 @@ function readStored(key, fallback) {
 
 function writeStored(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+async function requestCloudResume(method, resumeText) {
+  const response = await apiRequest("/api/users/resume", {
+    method,
+    ...(resumeText === undefined ? {} : { body: JSON.stringify({ resumeText }) }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "The resume could not be synced to your account.");
+  return result;
 }
 
 function sectionExists(text, section) {
@@ -1080,7 +1091,7 @@ function JobSearch({ analysis, resumeText = "" }) {
       <section className="ri-card ri-job-search-intro">
         <div className="ri-card-title-row">
           <span className="ri-card-icon target"><Search size={18} /></span>
-          <div><h2>Find current listings, including jobs in India</h2><p>Upload a resume above to prefill keywords, or enter them yourself. Resume text and keywords stay in your browser; an optional country/city filter helps find local listings.</p></div>
+          <div><h2>Find current listings, including jobs in India</h2><p>Upload a resume above to prefill keywords, or enter them yourself. Resume text is stored in your account; an optional country/city filter helps find local listings.</p></div>
         </div>
         <form className="ri-job-search-form" onSubmit={handleSearch}>
           <label className="ri-job-keywords">Keywords from your resume or profile
@@ -1143,6 +1154,7 @@ function ResumeIntelligence({ user }) {
   const storageKey = (key) => `${key}:${encodeURIComponent(user.id)}`;
   const profileStorageKey = storageKey(PROFILE_KEY);
   const resumeStorageKey = storageKey(RESUME_KEY);
+  const resumeCloudConsentKey = storageKey(RESUME_CLOUD_CONSENT_KEY);
   const tailorHeadingColorStorageKey = storageKey("skillai-resume-tailor-heading-color");
   const pageByRoute = {
     dashboard: ["Resume Dashboard", "Review the content extracted from your resume and choose a useful next step.", BarChart3],
@@ -1160,6 +1172,7 @@ function ResumeIntelligence({ user }) {
   const [resumeText, setResumeText] = useState(() => window.localStorage.getItem(resumeStorageKey) || "");
   const [uploadStatus, setUploadStatus] = useState("");
   const [uploadError, setUploadError] = useState("");
+  const [needsResumeCloudConsent, setNeedsResumeCloudConsent] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [profile, setProfile] = useState(() => readStored(profileStorageKey, {}));
   const [notice, setNotice] = useState("");
@@ -1185,6 +1198,39 @@ function ResumeIntelligence({ user }) {
     if (route === "skill-gaps") setCareerAnalysisTab("skills");
     if (route === "project-analyzer") setCareerAnalysisTab("project");
   }, [route]);
+
+  useEffect(() => {
+    if (user.authProvider !== "firebase") return undefined;
+    let active = true;
+    const localResumeAtStart = window.localStorage.getItem(resumeStorageKey) || "";
+    const syncAccountResume = async () => {
+      try {
+        const saved = await requestCloudResume("GET");
+        if (!active) return;
+        const currentLocalResume = window.localStorage.getItem(resumeStorageKey) || "";
+        if (currentLocalResume !== localResumeAtStart) {
+          return;
+        } else if (saved.resumeText) {
+          setResumeText(saved.resumeText);
+          window.localStorage.setItem(resumeStorageKey, saved.resumeText);
+          window.localStorage.setItem(resumeCloudConsentKey, "accepted");
+          setNotice("Loaded your resume saved to your account.");
+        } else {
+          const cloudConsent = window.localStorage.getItem(resumeCloudConsentKey);
+          if (currentLocalResume && cloudConsent === "accepted") {
+            await requestCloudResume("PUT", currentLocalResume);
+            if (active) setNotice("Your resume sync to your account is complete.");
+          } else if (currentLocalResume && !cloudConsent) {
+            setNeedsResumeCloudConsent(true);
+          }
+        }
+      } catch (error) {
+        if (active) setUploadError(`Resume account sync failed: ${error.message}`);
+      }
+    };
+    void syncAccountResume();
+    return () => { active = false; };
+  }, [user.authProvider, resumeStorageKey, resumeCloudConsentKey]);
 
   const analysis = useMemo(() => scanResume(resumeText), [resumeText]);
   const role = ROLES.find((item) => item.name === targetRole) || null;
@@ -1222,7 +1268,18 @@ function ResumeIntelligence({ user }) {
       writeStored(profileStorageKey, nextProfile);
       setAiResults({});
       setAiError("");
-      setNotice("Resume text saved locally on this device.");
+      setNeedsResumeCloudConsent(false);
+      if (user.authProvider === "firebase") {
+        window.localStorage.setItem(resumeCloudConsentKey, "accepted");
+        void requestCloudResume("PUT", text).then(() => {
+          setUploadError("");
+          setNotice("Resume text saved to your account.");
+        }).catch((error) => {
+          setUploadError(`Resume is saved in this browser but account sync failed: ${error.message}`);
+        });
+      } else {
+        setNotice("Resume text saved locally on this device.");
+      }
     }
   };
 
@@ -1240,11 +1297,39 @@ function ResumeIntelligence({ user }) {
     setProfile(nextProfile);
     writeStored(profileStorageKey, nextProfile);
     setResumeText("");
+    setNeedsResumeCloudConsent(false);
     setUploadStatus("");
     setUploadError("");
     setAiResults({});
     setAiError("");
-    setNotice("Resume text removed from this browser.");
+    if (user.authProvider === "firebase") {
+      void requestCloudResume("DELETE").then(() => {
+        setUploadError("");
+        setNotice("Resume text removed from your account.");
+      }).catch((error) => {
+        setUploadError(`Resume was removed from this browser but could not be removed from your account: ${error.message}`);
+      });
+    } else {
+      setNotice("Resume text removed from this browser.");
+    }
+  };
+
+  const syncExistingResume = async () => {
+    try {
+      await requestCloudResume("PUT", resumeText);
+      window.localStorage.setItem(resumeCloudConsentKey, "accepted");
+      setNeedsResumeCloudConsent(false);
+      setUploadError("");
+      setNotice("Your existing resume is now synced to your account.");
+    } catch (error) {
+      setUploadError(`Resume account sync failed: ${error.message}`);
+    }
+  };
+
+  const keepResumeLocal = () => {
+    window.localStorage.setItem(resumeCloudConsentKey, "declined");
+    setNeedsResumeCloudConsent(false);
+    setNotice("Your existing resume will stay only in this browser.");
   };
 
   const runAI = async (action, details = {}) => {
@@ -1399,7 +1484,7 @@ function ResumeIntelligence({ user }) {
               <article className="ri-dashboard-resume-card">
                 <div className="ri-dashboard-card-heading">
                   <span className="ri-card-icon"><FileText size={18} /></span>
-                  <div><h2>{resumeText ? "Your resume is ready" : "Add your resume"}</h2><p>{resumeText ? `${analysis.wordCount.toLocaleString()} words saved in this browser` : "Upload a file or create one to start."}</p></div>
+                  <div><h2>{resumeText ? "Your resume is ready" : "Add your resume"}</h2><p>{resumeText ? `${analysis.wordCount.toLocaleString()} words ${user.authProvider === "firebase" ? "saved with your account" : "saved in this browser"}` : "Upload a file or create one to start."}</p></div>
                 </div>
                 <div className="ri-dashboard-top-actions">
                   <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} compact hasResume={Boolean(resumeText)} />
@@ -1414,6 +1499,15 @@ function ResumeIntelligence({ user }) {
             </section>
           )}
 
+          {needsResumeCloudConsent && (
+            <section className="ri-card ri-cloud-consent" aria-label="Resume cloud storage choice">
+                    <div><h2>Sync your existing resume?</h2><p>This resume is currently only in this browser. Syncing stores its extracted text in your private account so it is available on your other devices. The admin dashboard shows storage size, not the resume contents.</p></div>
+              <div className="ri-dashboard-top-actions">
+                <button type="button" className="primary-button" onClick={() => void syncExistingResume()}>Sync to my account</button>
+                <button type="button" className="secondary-button" onClick={keepResumeLocal}>Keep local</button>
+              </div>
+            </section>
+          )}
           {notice && <div className="ri-notice" role="status"><Check size={16} />{notice}</div>}
           {aiError && route !== "job-match" && <p className="ri-job-error" role="alert">{aiError}</p>}
 
@@ -1422,8 +1516,8 @@ function ResumeIntelligence({ user }) {
               <div className="ri-upload-copy">
                 <span className="ri-upload-kicker">{resumeText ? "RESUME READY" : "START WITH YOUR RESUME"}</span>
                 <strong>{resumeText ? "Your resume is ready to review" : "Bring your experience into focus"}</strong>
-                <p>{resumeText ? "Review the extracted text before using career tools. Your file stays on this device unless you choose an AI action." : "Upload an existing resume and we’ll extract its text locally, so you can review it before using career tools."}</p>
-                <span className="ri-upload-privacy"><ShieldCheck size={15} /> Stored in this browser · sent for AI review only when you choose an AI action</span>
+                <p>{resumeText ? "Review extracted resume text before using career tools. The original file stays on your device; extracted text syncs to your account." : "Upload an existing resume and we’ll extract its text locally, so you can review it before using career tools."}</p>
+                <span className="ri-upload-privacy"><ShieldCheck size={15} /> Text stored in your account · sent for AI review only when you choose an AI action</span>
                 {resumeText && <button type="button" className="ri-clear-button" onClick={clearResume}><Trash2 size={15} />Remove saved resume</button>}
               </div>
               <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} />
@@ -1639,7 +1733,7 @@ function ResumeIntelligence({ user }) {
             </>
           )}
 
-          {route === "builder" && <ResumeBuilder profile={profile} onUpdate={updateProfile} onExport={exportResume} onBuilt={(text) => handleResumeRead(text, "Builder draft saved locally.", false, "")} />}
+          {route === "builder" && <ResumeBuilder profile={profile} onUpdate={updateProfile} onExport={exportResume} onBuilt={(text) => handleResumeRead(text, user.authProvider === "firebase" ? "Builder draft saved to your account." : "Builder draft saved locally.", false, "")} />}
 
           {isMatchTailorRoute && (
             <section className="ri-card ri-match-tailor-workspace">
