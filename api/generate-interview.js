@@ -1,4 +1,4 @@
-import { handleGenerateInterviewRequest } from "../backend/server/interview-api.js";
+import { handleGenerateInterviewRequest } from "../backend/src/modules/interview/interview-api.js";
 
 export default async function generateInterview(request, response) {
   await handleGenerateInterviewRequest(request, response);

@@ -2,7 +2,14 @@
   "name": "robotics-lab-api",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "esbuild src/lambda.js --bundle --platform=node --format=esm --target=es2022 --minify --external:firebase-admin --external:firebase-admin/* --outfile=dist/lambda.mjs",
+    "start": "node src/http-server.js",
+    "start:local": "node --env-file=.env src/http-server.js",
+    "test": "node --test src/*.test.js src/modules/*/*.test.js"
+  },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1148.0",
     "firebase-admin": "^14.5.0"
   },
   "devDependencies": {

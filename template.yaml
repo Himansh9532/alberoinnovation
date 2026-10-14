@@ -18,6 +18,17 @@ Parameters:
     Type: String
     Default: Business@alberotechnologies.com
     Description: Business email address that receives a blind copy of payment receipts.
+  FrontendDomainName:
+    Type: String
+    Default: alberoinnovation.com
+    Description: Custom frontend domain name covered by the CloudFront certificate.
+  FrontendCertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate ARN for the frontend domain, issued in us-east-1. Leave empty to use the default CloudFront domain.
+
+Conditions:
+  UseCustomFrontendDomain: !Not [!Equals [!Ref FrontendCertificateArn, ""]]
 
 Globals:
   Function:
@@ -28,7 +39,10 @@ Globals:
       - x86_64
     Environment:
       Variables:
-        CORS_ALLOWED_ORIGINS: !Sub "https://${FrontendDistribution.DomainName}"
+        CORS_ALLOWED_ORIGINS: !If
+          - UseCustomFrontendDomain
+          - !Sub "https://${FrontendDomainName}"
+          - !Sub "https://${FrontendDistribution.DomainName}"
         GEMINI_MODEL: !Ref GeminiModel
         SES_FROM_EMAIL: !Ref SesFromEmail
         PAYMENT_RECEIPT_ADMIN_EMAIL: !Ref PaymentReceiptAdminEmail
@@ -67,11 +81,30 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  FrontendRouteRewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub "${AWS::StackName}-frontend-route-rewrite"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Serve prerendered clean-route HTML files from the frontend bucket.
+        Runtime: cloudfront-js-1.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          if (uri !== "/" && uri.indexOf(".") === -1) {
+            request.uri = uri.replace(/\/$/, "") + "/index.html";
+          }
+          return request;
+        }
+
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
+        Aliases: !If [UseCustomFrontendDomain, [!Ref FrontendDomainName], !Ref AWS::NoValue]
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_100
@@ -92,6 +125,9 @@ Resources:
             - HEAD
           Compress: true
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt FrontendRouteRewriteFunction.FunctionARN
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
@@ -105,7 +141,10 @@ Resources:
           GeoRestriction:
             RestrictionType: none
         ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+          AcmCertificateArn: !If [UseCustomFrontendDomain, !Ref FrontendCertificateArn, !Ref AWS::NoValue]
+          SslSupportMethod: !If [UseCustomFrontendDomain, sni-only, !Ref AWS::NoValue]
+          MinimumProtocolVersion: !If [UseCustomFrontendDomain, TLSv1.2_2021, !Ref AWS::NoValue]
+          CloudFrontDefaultCertificate: !If [UseCustomFrontendDomain, !Ref AWS::NoValue, true]
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -129,8 +168,10 @@ Resources:
     Properties:
       StageName: $default
       CorsConfiguration:
-        AllowOrigins:
-          - !Sub "https://${FrontendDistribution.DomainName}"
+        AllowOrigins: !If
+          - UseCustomFrontendDomain
+          - [!Sub "https://${FrontendDomainName}"]
+          - [!Sub "https://${FrontendDistribution.DomainName}"]
         AllowHeaders:
           - Authorization
           - Content-Type
@@ -144,7 +185,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/
-      Handler: server/lambda.handler
+      Handler: src/lambda.handler
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
@@ -211,7 +252,7 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         EntryPoints:
-          - server/lambda.js
+          - src/lambda.js
         Format: esm
         Target: es2022
         Minify: true
@@ -223,8 +264,11 @@ Resources:
 
 Outputs:
   FrontendUrl:
-    Description: CloudFront URL for the static frontend.
-    Value: !Sub "https://${FrontendDistribution.DomainName}"
+    Description: Public URL for the static frontend.
+    Value: !If
+      - UseCustomFrontendDomain
+      - !Sub "https://${FrontendDomainName}"
+      - !Sub "https://${FrontendDistribution.DomainName}"
   FrontendBucketName:
     Description: Private S3 bucket for the built frontend files.
     Value: !Ref FrontendBucket

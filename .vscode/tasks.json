@@ -6,9 +6,7 @@
 			"type": "shell",
 			"command": "npm run build",
 			"isBackground": false,
-			"problemMatcher": [
-				"$tsc"
-			],
+			"problemMatcher": ["$tsc"],
 			"group": "build"
 		},
 		{
@@ -16,19 +14,23 @@
 			"type": "shell",
 			"command": "powershell -ExecutionPolicy Bypass -Command \"npm run build\"",
 			"isBackground": false,
-			"problemMatcher": [
-				"$tsc"
-			],
+			"problemMatcher": ["$tsc"],
 			"group": "build"
 		},
 		{
-			"label": "Final build verification",
+			"label": "Run project tests",
 			"type": "shell",
-			"command": "powershell -ExecutionPolicy Bypass -Command \"npm run build\"",
+			"command": "powershell -ExecutionPolicy Bypass -Command \"npm test\"",
 			"isBackground": false,
-			"problemMatcher": [
-				"$tsc"
-			],
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Build backend bundle",
+			"type": "shell",
+			"command": "powershell -ExecutionPolicy Bypass -Command \"npm run build:backend\"",
+			"isBackground": false,
+			"problemMatcher": [],
 			"group": "build"
 		}
 	]

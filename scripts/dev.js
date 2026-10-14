@@ -4,11 +4,11 @@ const root = process.cwd();
 const children = [
   {
     name: "API",
-    args: ["--env-file=backend/.env", "backend/server/http-server.js"],
+    args: ["--env-file=backend/.env", "backend/src/http-server.js"],
   },
   {
     name: "Vite",
-    args: ["node_modules/vite/bin/vite.js"],
+    args: ["frontend/node_modules/vite/bin/vite.js", "frontend"],
   },
 ];
 

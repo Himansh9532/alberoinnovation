@@ -5,10 +5,37 @@ A React and Vite platform for online skill assessments, AI interview practice, c
 ## Local development
 
 ```sh
-npm install
+npm install --prefix frontend
+npm install --prefix backend
 ```
 
-Copy `.env.example` to `.env.local` and set the Firebase web app values. Copy `.env.development.example` to `.env.development.local`. Copy `backend/.env.example` to `backend/.env` and set the backend credentials.
+Copy `frontend/.env.example` to `frontend/.env.local` and set the Firebase web app values. Copy `frontend/.env.development.example` to `frontend/.env.development.local`. Copy `backend/.env.example` to `backend/.env` and set the backend credentials.
+
+## Repository structure
+
+```text
+frontend/
+   public/
+   src/
+      components/       # shared layout and UI
+      data/             # browser data and academic paths
+      features/         # auth, interview, assessment, resume
+      services/         # authenticated API client
+      styles/
+backend/
+   src/
+      middleware/
+      modules/          # billing, interview, jobs, research, resume
+      http-server.js
+      lambda.js
+      routes.js
+shared/               # small cross-runtime domain modules
+api/                   # compatibility entry points
+scripts/               # root development launcher
+docs/
+```
+
+Install frontend and backend dependencies separately with the two commands above. Root scripts remain available for combined development, tests, and production builds.
 
 Start the API backend and frontend together:
 
@@ -44,7 +71,9 @@ For deployment, add `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`) as server-s
 
 ### AWS static frontend and separate API backend
 
-The frontend and backend are deployed as separate AWS services: the static frontend is stored in a private **Amazon S3** bucket and delivered through **CloudFront**, while API requests run independently on **AWS Lambda + API Gateway**. Static page and asset traffic is served by CloudFront instead of occupying API compute. `template.yaml` provisions both sides with separate resources; the frontend output is the generated `dist/` folder.
+The frontend and backend are deployed as separate AWS services: the static frontend is stored in a private **Amazon S3** bucket and delivered through **CloudFront**, while API requests run independently on **AWS Lambda + API Gateway**. Static page and asset traffic is served by CloudFront instead of occupying API compute. `template.yaml` provisions both sides with separate resources; the frontend output is `frontend/dist/`. The build prerenders page metadata for public routes and CloudFront serves those route-specific files at clean URLs.
+
+The source tree follows the same separation: `frontend/` owns the Vite app, assets, and browser dependencies; `backend/` owns the Node API, domain modules, and server dependencies. Root `shared/` contains small modules consumed by both sides, while `api/` retains thin compatibility entry points.
 
 Install and configure the AWS CLI and AWS SAM CLI with permissions to create S3, CloudFront, API Gateway, Lambda, IAM, and related resources in your AWS account. CloudFront distribution creation can take several minutes.
 
@@ -57,28 +86,28 @@ Install and configure the AWS CLI and AWS SAM CLI with permissions to create S3,
    ```powershell
    $env:VITE_API_BASE_URL = "<BackendApiUrl>"
    npm run build
-   aws s3 sync .\dist\ s3://<FrontendBucketName> --delete
+   aws s3 sync .\frontend\dist\ s3://<FrontendBucketName> --delete
    aws cloudfront create-invalidation --distribution-id <FrontendDistributionId> --paths "/*"
    ```
 
-   `npm run build` creates the `dist/` folder; upload its contents, not the folder itself. Open `FrontendUrl` after the CloudFront deployment is complete.
+   `npm run build` creates `frontend/dist/`; upload its contents, not the folder itself. Open `FrontendUrl` after the CloudFront deployment is complete.
 
 The Lambda receives backend-only credentials from Secrets Manager; never place these in frontend variables or upload them to S3. After rotating a secret, redeploy the SAM stack so Lambda's environment picks up the new secret value.
 
-For local development, the frontend and backend can still run in separate terminals with separate env files: root `.env.local` for browser-safe frontend values and `backend/.env` for server-only credentials.
+For local development, the frontend and backend can still run in separate terminals with separate env files: `frontend/.env.local` for browser-safe frontend values and `backend/.env` for server-only credentials.
 
 ### Search engine setup
 
-The frontend includes page-specific titles and descriptions, canonical URLs, structured `WebSite` data, `robots.txt`, and a sitemap for public pages. Before submitting it to search engines:
+The frontend includes page-specific titles and descriptions, canonical URLs, structured `WebSite` data, and a sitemap for public pages. Before submitting it to search engines:
 
-1. Point `www.alberotechnologies.in` to the CloudFront distribution and add it as an alternate domain name with a valid HTTPS certificate issued in `us-east-1`. Configure DNS only after CloudFront is ready.
-2. Confirm `https://www.alberotechnologies.in/robots.txt` and `https://www.alberotechnologies.in/sitemap.xml` load over HTTPS.
-3. Verify the domain property in Google Search Console using the DNS TXT record Google provides, then submit `https://www.alberotechnologies.in/sitemap.xml`.
+1. Request or import a valid ACM HTTPS certificate for `alberoinnovation.com` in `us-east-1`. During SAM deployment, set `FrontendCertificateArn` to that certificate ARN; `FrontendDomainName` defaults to `alberoinnovation.com`. The template configures the CloudFront alias and API CORS for this domain. Configure DNS to point to CloudFront only after the distribution is ready.
+2. Confirm `https://alberoinnovation.com/sitemap.xml` loads over HTTPS.
+3. Verify the domain property in Google Search Console using the DNS TXT record Google provides, then submit `https://alberoinnovation.com/sitemap.xml`.
 4. Publish useful, original assessment guides and field-specific content, and request indexing for the main public pages. Search ranking and first-page placement are determined by search engines and cannot be guaranteed by metadata alone.
 
 ## Google, Microsoft, and Apple sign-in
 
-The login and registration pages support Firebase Authentication pop-up sign-in with Google, Microsoft, and Apple. Copy the Firebase web app settings into `.env.local` using the `VITE_FIREBASE_*` variables in `.env.example`, then enable each provider in Firebase Console under **Authentication → Sign-in method**. Add the local and production website domains under **Authentication → Settings → Authorized domains**. Microsoft and Apple also require their respective OAuth application credentials to be configured in Firebase Console.
+The login and registration pages support Firebase Authentication pop-up sign-in with Google, Microsoft, and Apple. After any successful sign-in or registration, SkillAI asks the user to acknowledge how account data and text submitted to AI features are processed before opening the requested page. Copy the Firebase web app settings into `frontend/.env.local` using the `VITE_FIREBASE_*` variables in `frontend/.env.example`, then enable each provider in Firebase Console under **Authentication → Sign-in method**. Add the local and production website domains under **Authentication → Settings → Authorized domains**. Microsoft and Apple also require their respective OAuth application credentials to be configured in Firebase Console.
 
 The Firebase web app config is intended for browser use. Email/password and social authentication use Firebase when these values are configured. Demo/local accounts are for UI preview only; they cannot access server-verified plan limits or checkout.
 
@@ -99,7 +128,9 @@ The server transactionally enforces usage against the authenticated Firebase UID
 
 ## Resume Intelligence
 
-The Resume navigation mega-menu opens dedicated routes for dashboard, analyzer, builder, job-description matching, public job search, role catalog comparisons, tailoring, skill-term checks, project notes, career profile, versions, and career package. Resume file text and builder/profile snapshots are stored in browser local storage only, under keys scoped to the signed-in account ID on that browser. They are not uploaded or synced between devices. Previously stored unscoped resume data is not shown as the signed-in user's resume. PDF, DOC, DOCX, and TXT text extraction is performed in the browser. DOCX export creates a Word document; Print / Save PDF uses the browser print dialog.
+The Resume navigation mega-menu opens dedicated routes for dashboard, analyzer, builder, Optimize (combined job-description matching and resume tailoring), public job search, combined Career Analysis (skill gaps and project analysis), skill-term checks, project notes, and career profile. Resume file text and builder/profile snapshots are stored in browser local storage only, under keys scoped to the signed-in account ID on that browser. They are not uploaded or synced between devices. Previously stored unscoped resume data is not shown as the signed-in user's resume. PDF, DOC, DOCX, and TXT text extraction is performed in the browser. DOCX export creates a Word document; Print / Save PDF uses the browser print dialog.
+
+Resume Builder offers six photo-ready templates. An optional JPG, PNG, or WebP photo is resized in the browser and stored with that user's local profile; it is included in the live preview and photo-ready PDF/DOCX exports, and is not sent to AI services.
 
 Role and skill-term comparisons include example roles across engineering and technology, business and finance, healthcare and life sciences, science and research, design and creative arts, law and public service, agriculture and environment, and education and humanities. These show exact text matches against a limited built-in catalog; they are not job-fit recommendations or an exhaustive list of occupations.
 
@@ -115,3 +146,10 @@ The interview setup offers five locally generated 3D interviewer avatars (three 
 npm run build
 npm run preview
 ```
+
+## Project documentation
+
+- [Architecture](./docs/ARCHITECTURE.md)
+- [API reference](./docs/API.md)
+- [Contributing](./docs/CONTRIBUTING.md)
+- [Codebase audit](./docs/REFACTORING-AUDIT.md)
