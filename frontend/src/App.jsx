@@ -52,6 +52,7 @@ import { academicPaths } from "./data/academic-paths";
 import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../../shared/plan-pricing.js";
 import { SEO_IMAGE_URL, SEO_PAGES, SEO_SITE_URL } from "../../shared/seo-pages.js";
 import { AppShell, Sidebar } from "./components/layout/ui.jsx";
+import CookieConsent, { openCookieSettings } from "./components/shared/CookieConsent.jsx";
 import AdminPage from "./features/admin/AdminPage.jsx";
 
 const InterviewExperiencePage = lazy(() => import("./features/interview/components/InterviewExperience"));
@@ -2787,6 +2788,7 @@ function Footer() {
         <span>© 2026 · All rights reserved · Albero Technologies</span>
         <span>Privacy</span>
         <span>Terms</span>
+        <button type="button" className="footer-cookie-settings" onClick={openCookieSettings}>Cookie settings</button>
         <Link to="/contact">Contact us</Link>
         <span className="footer-credit">Website by <a href="https://www.albero.in/" target="_blank" rel="noopener noreferrer">Albero</a></span>
       </div>
@@ -2990,6 +2992,7 @@ function App() {
         </Routes>
       </main>
       <Footer />
+      <CookieConsent />
     </>
   );
 
