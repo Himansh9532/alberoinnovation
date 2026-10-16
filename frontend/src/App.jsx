@@ -2690,7 +2690,10 @@ function DashboardPage({ user }) {
 
           <div className="dashboard-grid">
             <section className="panel-card dashboard-activity-panel">
-              <div className="panel-header"><strong>Recent activity</strong><span>{activity.interviews.length + activity.assessments.length} completed</span></div>
+              <div className="panel-header">
+                <strong>Recent activity</strong>
+                <span>{activity.interviews.length + activity.assessments.length} completed</span>
+              </div>
               {!isActivityLoaded ? (
                 <p className="dashboard-activity-empty">Loading your recent progress...</p>
               ) : recentActivity.length ? (
@@ -2788,7 +2791,6 @@ function Footer() {
         <span>© 2026 · All rights reserved · Albero Technologies</span>
         <span>Privacy</span>
         <span>Terms</span>
-        <button type="button" className="footer-cookie-settings" onClick={openCookieSettings}>Cookie settings</button>
         <Link to="/contact">Contact us</Link>
         <span className="footer-credit">Website by <a href="https://www.albero.in/" target="_blank" rel="noopener noreferrer">Albero</a></span>
       </div>
