@@ -1,0 +1,93 @@
+name: Deploy to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        default: prod
+        type: string
+
+      stack_name:
+        description: CloudFormation stack name
+        required: true
+        default: albero-innovation
+        type: string
+
+      backend_secrets_name:
+        description: Secrets Manager secret name or ARN for backend credentials
+        required: true
+        default: albero-innovation/backend
+        type: string
+
+      gemini_model:
+        description: Gemini model for the backend
+        required: false
+        default: gemini-3.5-flash
+        type: string
+
+      frontend_domain_name:
+        description: Custom frontend domain name
+        required: false
+        default: albero-innovation.in
+        type: string
+
+      frontend_certificate_arn:
+        description: ACM certificate ARN for the custom frontend domain (optional)
+        required: false
+        default: ""
+        type: string
+
+      ses_from_email:
+        description: Verified SES sender email
+        required: false
+        default: ""
+        type: string
+
+      payment_receipt_admin_email:
+        description: Admin email used for payment receipt blind copy
+        required: false
+        default: Business@alberotechnologies.com
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install AWS SAM CLI
+        run: |
+          python -m pip install --upgrade pip
+          pip install aws-sam-cli
+
+      - name: Build and deploy SAM stack
+        run: |
+          sam deploy \
+            --template-file template.yaml \
+            --stack-name "${{ inputs.stack_name }}" \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              GeminiModel="${{ inputs.gemini_model }}" \
+              BackendSecretsName="${{ inputs.backend_secrets_name }}" \
+              SesFromEmail="${{ inputs.ses_from_email }}" \
+              PaymentReceiptAdminEmail="${{ inputs.payment_receipt_admin_email }}" \
+              FrontendDomainName="${{ inputs.frontend_domain_name }}" \
+              FrontendCertificateArn="${{ inputs.frontend_certificate_arn }}"

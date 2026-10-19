@@ -53,6 +53,12 @@ async function readJsonBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function isTextWithinBounds(value, minimum, maximum) {
+  if (typeof value !== "string") return false;
+  const trimmedText = value.trim();
+  return trimmedText.length >= minimum && trimmedText.length <= maximum;
+}
+
 function validatePayload(payload, endpoint) {
   if (!payload || typeof payload !== "object") return "Interview details are required.";
   const { action = "questions", branch, domain, durationMinutes, course } = payload;
@@ -60,42 +66,36 @@ function validatePayload(payload, endpoint) {
   const isAssessmentGenerate = action === "assessment-generate";
   const isAssessmentEvaluate = action === "assessment-evaluate";
   if (isAssessment !== (isAssessmentGenerate || isAssessmentEvaluate)) return "Choose a valid AI assessment action.";
-  if (typeof branch !== "string" || branch.trim().length < 2 || branch.length > 100) return "Choose a valid branch or stream.";
-  if (typeof domain !== "string" || domain.trim().length < 2 || domain.length > 120) return "Choose a valid interview domain.";
-  if (isAssessment && (typeof course !== "string" || course.trim().length < 2 || course.length > 120)) return "Choose a valid course.";
+  if (!isTextWithinBounds(branch, 2, 100)) return "Choose a valid branch or stream.";
+  if (!isTextWithinBounds(domain, 2, 120)) return "Choose a valid interview domain.";
+  if (isAssessment && !isTextWithinBounds(course, 2, 120)) return "Choose a valid course.";
   if (!isAssessment && !ALLOWED_DURATIONS.has(Number(durationMinutes))) return "Choose a valid interview duration.";
   if (isAssessmentGenerate && !ALLOWED_ASSESSMENT_LENGTHS.has(Number(payload.questionCount))) return "Choose the supported 20-question assessment.";
   if (isAssessmentEvaluate) {
     if (!Array.isArray(payload.answers) || !ALLOWED_ASSESSMENT_LENGTHS.has(payload.answers.length)) return "Assessment answers must contain exactly 20 questions.";
     if (payload.answers.some((item) => (
       !item
-      || typeof item.question !== "string"
-      || item.question.trim().length < 10
-      || item.question.length > 400
+      || !isTextWithinBounds(item.question, 10, 400)
       || !Array.isArray(item.options)
       || item.options.length !== 4
-      || item.options.some((option) => typeof option !== "string" || option.trim().length < 1 || option.length > 180)
+      || item.options.some((option) => !isTextWithinBounds(option, 1, 180))
       || !Number.isInteger(item.correctOption)
       || item.correctOption < 0
       || item.correctOption > 3
       || (item.selectedOption !== null && (!Number.isInteger(item.selectedOption) || item.selectedOption < 0 || item.selectedOption > 3))
-      || typeof item.explanation !== "string"
-      || item.explanation.trim().length < 8
-      || item.explanation.length > 500
+      || !isTextWithinBounds(item.explanation, 8, 500)
     ))) return "One or more assessment answers are invalid.";
     return "";
   }
   if (isAssessmentGenerate) return "";
   if (action === "questions") {
     if (typeof payload.resumeText !== "string" || payload.resumeText.trim().length < 80) return "The resume does not contain enough readable text to generate personalized questions.";
-    if (payload.resumeText.length > MAX_RESUME_LENGTH) return "Resume text exceeds the allowed length.";
+    if (payload.resumeText.trim().length > MAX_RESUME_LENGTH) return "Resume text exceeds the allowed length.";
   } else if (action === "evaluate") {
     if (!Array.isArray(payload.answers) || payload.answers.length < 1 || payload.answers.length > 5) return "Interview answers are required to generate a result.";
     if (payload.answers.some((item) => (
       !item
-      || typeof item.question !== "string"
-      || item.question.trim().length < 5
-      || item.question.length > 500
+      || !isTextWithinBounds(item.question, 5, 500)
       || typeof item.answer !== "string"
       || item.answer.length > 5000
     ))) return "One or more interview answers are invalid.";

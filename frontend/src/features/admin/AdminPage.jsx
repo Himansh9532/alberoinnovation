@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { LockKeyhole, LogOut, RefreshCw, Users } from "lucide-react";
+import { Download, LockKeyhole, LogOut, RefreshCw, Users } from "lucide-react";
 import { apiUrl } from "../../services/api-client.js";
+import { createAdminCsv } from "./services/admin-export.js";
 
 const ADMIN_TOKEN_KEY = "skillai-admin-session";
 
@@ -81,6 +82,16 @@ export default function AdminPage() {
     setPassword("");
   };
 
+  const handleExport = () => {
+    const csv = createAdminCsv(stats);
+    const blobUrl = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `skillai-admin-data-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  };
+
   return (
     <main className="admin-page">
       {!token ? (
@@ -109,6 +120,7 @@ export default function AdminPage() {
           <header className="admin-header">
             <div><p className="eyebrow">SkillAI overview</p><h1>Admin dashboard</h1><p>Account activity and stored resume text size. Resume contents are not shown here.</p></div>
             <div className="admin-actions">
+              {stats && <button className="secondary-button" type="button" onClick={handleExport}><Download size={16} /> Download Excel (CSV)</button>}
               <button className="secondary-button" type="button" onClick={() => void loadStats(token)} disabled={isLoading}><RefreshCw size={16} /> Refresh</button>
               <button className="secondary-button" type="button" onClick={handleLogout}><LogOut size={16} /> Sign out</button>
             </div>

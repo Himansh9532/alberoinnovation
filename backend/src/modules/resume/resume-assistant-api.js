@@ -43,7 +43,9 @@ async function readJsonBody(request) {
 }
 
 function validString(value, minimum, maximum) {
-  return typeof value === "string" && value.trim().length >= minimum && value.length <= maximum;
+  if (typeof value !== "string") return false;
+  const trimmedText = value.trim();
+  return trimmedText.length >= minimum && trimmedText.length <= maximum;
 }
 
 export function validateResumeAssistantPayload(payload) {

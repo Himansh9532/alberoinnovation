@@ -58,17 +58,23 @@ function isRateLimited(request) {
   return current.count > RATE_LIMIT_REQUESTS;
 }
 
+function isTextWithinBounds(value, minimum, maximum) {
+  if (typeof value !== "string") return false;
+  const trimmedText = value.trim();
+  return trimmedText.length >= minimum && trimmedText.length <= maximum;
+}
+
 function validatePayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "Paper details are required.";
   if (!["summarize", "ask"].includes(payload.action)) return "Choose summary or ask a paper question.";
-  if (typeof payload.paperId !== "string" || payload.paperId.length > 300) return "Choose a valid research paper.";
-  if (typeof payload.title !== "string" || payload.title.trim().length < 5 || payload.title.length > 800) return "The paper title is invalid.";
-  if (typeof payload.abstract !== "string" || payload.abstract.trim().length < 40 || payload.abstract.length > MAX_PAPER_TEXT_LENGTH) {
+  if (!isTextWithinBounds(payload.paperId, 1, 300)) return "Choose a valid research paper.";
+  if (!isTextWithinBounds(payload.title, 5, 800)) return "The paper title is invalid.";
+  if (!isTextWithinBounds(payload.abstract, 40, MAX_PAPER_TEXT_LENGTH)) {
     return "This paper does not have enough abstract text for an AI summary or question.";
   }
   if (
     payload.action === "ask"
-    && (typeof payload.question !== "string" || payload.question.trim().length < 3 || payload.question.length > MAX_QUESTION_LENGTH)
+    && !isTextWithinBounds(payload.question, 3, MAX_QUESTION_LENGTH)
   ) return "Enter a question about this paper (up to 500 characters).";
   if (
     payload.history !== undefined
@@ -76,10 +82,8 @@ function validatePayload(payload) {
       || payload.history.length > 8
       || payload.history.some((item) => (
         !item
-        || typeof item.question !== "string"
-        || item.question.length > MAX_QUESTION_LENGTH
-        || typeof item.answer !== "string"
-        || item.answer.length > 6000
+        || !isTextWithinBounds(item.question, 1, MAX_QUESTION_LENGTH)
+        || !isTextWithinBounds(item.answer, 1, 6000)
       )))
   ) return "The paper conversation is invalid. Start a new paper session and try again.";
   return "";

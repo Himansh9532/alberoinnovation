@@ -47,6 +47,25 @@ test("interview and assessment handlers reject request bodies larger than the by
   }
 });
 
+test("interview validation accepts text values with surrounding whitespace", async () => {
+  const response = createResponse();
+  await handleGenerateInterviewRequest({
+    method: "POST",
+    headers: {},
+    body: JSON.stringify({
+      action: "questions",
+      branch: "  Data Science  ",
+      domain: "  Product Discovery  ",
+      durationMinutes: 15,
+      resumeText: `${" ".repeat(90)} ${"A capable product analyst with SQL, Python, and stakeholder communication experience in multiple business contexts. "}`,
+    }),
+    socket: { remoteAddress: "whitespace-validation" },
+  }, response);
+
+  assert.equal(response.statusCode, 503);
+  assert.match(JSON.parse(response.body).error, /AI question generation is not configured yet|The configured agent model name is invalid/);
+});
+
 test("interview rate limits use the adapter's source address instead of a forwarded client header", async () => {
   const clientAddress = `rate-limit-test-${Date.now()}`;
   const handler = handleGenerateInterviewRequest;

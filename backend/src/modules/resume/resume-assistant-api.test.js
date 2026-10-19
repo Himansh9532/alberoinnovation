@@ -58,6 +58,17 @@ test("AI skill-gap results must use only supplied role skills", () => {
   }, payload), /incomplete target-role skill analysis/);
 });
 
+test("resume AI text validation ignores surrounding whitespace when enforcing length limits", () => {
+  const paddedResume = `   ${resumeText}  `;
+  assert.equal(validateResumeAssistantPayload({ action: "analyze", resumeText: paddedResume }), "");
+  assert.equal(validateResumeAssistantPayload({
+    action: "tailor",
+    resumeText: paddedResume,
+    jobDescription: `   ${"x".repeat(40)}   `,
+    targetRole: "  Data Analyst  ",
+  }), "");
+});
+
 test("AI resume review validates evidence and action structure", () => {
   const result = {
     summary: "The resume has relevant project evidence and can improve its focus.",
