@@ -53,10 +53,10 @@ import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../../shared/plan-pricing.j
 import { SEO_IMAGE_URL, SEO_PAGES, SEO_SITE_URL } from "../../shared/seo-pages.js";
 import { AppShell, Sidebar } from "./components/layout/ui.jsx";
 import CookieConsent, { openCookieSettings } from "./components/shared/CookieConsent.jsx";
-import AdminPage from "./features/admin/AdminPage.jsx";
 
 const InterviewExperiencePage = lazy(() => import("./features/interview/components/InterviewExperience"));
 const SkillAssessmentPage = lazy(() => import("./features/assessment/components/SkillAssessment"));
+const AdminPage = lazy(() => import("./features/admin/AdminPage.jsx"));
 const loadResumeIntelligence = () => import("./features/resume/components/ResumeIntelligence");
 const ResumeIntelligence = lazy(loadResumeIntelligence);
 const preloadResumeIntelligence = () => {
@@ -387,27 +387,27 @@ function HomePage() {
 
   const testimonials = [
     {
-      image: "/interviewers/rohan.jpg",
+      image: "/interviewers/rohan-testimonial.webp",
       role: "Engineering student",
       quote: "I used the mock interview prompts to practice structuring my answers before applying for an internship.",
     },
     {
-      image: "/interviewers/maya.jpg",
+      image: "/interviewers/maya-testimonial.webp",
       role: "Recent graduate",
       quote: "The assessment feedback helped me choose one skill to focus on instead of trying to learn everything at once.",
     },
     {
-      image: "/interviewers/jordan-reference.png",
+      image: "/interviewers/jordan-testimonial.webp",
       role: "Business student",
       quote: "I could compare my resume with a role and spot the experience I needed to make clearer.",
     },
     {
-      image: "/interviewers/amir.jpg",
+      image: "/interviewers/amir-testimonial.webp",
       role: "Research learner",
       quote: "Finding papers by topic gave me a better starting point for my research outline.",
     },
     {
-      image: "/interviewers/alex.jpg",
+      image: "/interviewers/alex-testimonial.webp",
       role: "Early-career professional",
       quote: "The career tools helped me break a bigger goal into a few manageable next steps.",
     },
@@ -434,6 +434,9 @@ function HomePage() {
           <img
             src="/career-assessment.svg"
             alt="Illustration of a learner reviewing skills and career progress"
+            width={560}
+            height={420}
+            fetchPriority="high"
           />
           <div className="home-visual-caption">
             <span className="home-caption-mark"><Sparkles size={17} aria-hidden="true" /></span>
@@ -465,7 +468,7 @@ function HomePage() {
                 <article key={testimonial.role} className="testimonial-card">
                   <blockquote>“{testimonial.quote}”</blockquote>
                   <div className="testimonial-profile">
-                    <img src={testimonial.image} alt="" loading="lazy" />
+                    <img src={testimonial.image} alt="" width={48} height={48} loading="lazy" />
                     <div>
                       <strong>Sample learner {index + 1}</strong>
                       <small>{testimonial.role}</small>
@@ -2757,20 +2760,20 @@ function Footer() {
 
         <div className="footer-links">
           <div>
-            <h4>Platform</h4>
+            <h3>Platform</h3>
             <Link to="/">Home</Link>
             <Link to="/domains">Domains</Link>
             <Link to="/interview">AI Interview</Link>
             <Link to="/pricing">Pricing</Link>
           </div>
           <div>
-            <h4>Learning</h4>
+            <h3>Learning</h3>
             <Link to="/assessment">Skill Assessment</Link>
             <Link to="/research">Research Hub</Link>
             <Link to="/roadmap">Career Roadmap</Link>
           </div>
           <div>
-            <h4>Resources</h4>
+            <h3>Resources</h3>
             <Link to="/resources">Resources</Link>
             <Link to="/login">Login</Link>
             <Link to="/register">Get Started</Link>
@@ -2830,7 +2833,7 @@ function App() {
 
   useEffect(() => {
     const page = getSeoPage(location.pathname);
-    const canonicalUrl = `${SEO_SITE_URL}${page.path === "/" ? "/" : page.path}`;
+    const canonicalUrl = `${SEO_SITE_URL}${page.path === "/" ? "/" : `${page.path}/`}`;
     document.title = page.title;
 
     const setMetaContent = (selector, content) => {
@@ -2945,7 +2948,13 @@ function App() {
     && !location.state.from.startsWith("//")
     ? location.state.from
     : "/dashboard";
-  if (location.pathname === "/admin") return <AdminPage />;
+  if (location.pathname === "/admin") {
+    return (
+      <Suspense fallback={<main className="page-shell"><div className="wrap">Loading admin tools...</div></main>}>
+        <AdminPage />
+      </Suspense>
+    );
+  }
 
   const resumePage = (
     <Suspense fallback={<main className="page-shell ri-page"><div className="wrap ri-route-loading" role="status" aria-live="polite"><LoaderCircle size={20} aria-hidden="true" /> Opening your resume workspace…</div></main>}>

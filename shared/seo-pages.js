@@ -3,31 +3,31 @@ export const SEO_IMAGE_URL = `${SEO_SITE_URL}/career-learning-team.jpg`;
 
 export const SEO_PAGES = {
   "/": {
-    title: "Online Skill Assessments & Career Tools | SkillAI",
-    description: "Assess your skills, explore your strengths, practice AI-powered interviews, and get practical career guidance with SkillAI.",
+    title: "Online Skill Assessment & Career Tools | SkillAI",
+    description: "Build job-ready skills with online assessments, AI mock interview practice, a student resume builder, and practical career tools from SkillAI.",
   },
   "/pricing": {
-    title: "Plans and Pricing for SkillAI",
-    description: "Compare SkillAI plans for AI interview practice and online skill assessments. Choose the option that fits your goals.",
+    title: "SkillAI Pricing | Interview Practice & Skill Assessments",
+    description: "Explore SkillAI plans for AI interview practice, online skill assessments, and career tools. Compare available features and choose a plan that fits.",
   },
   "/contact": {
-    title: "Contact SkillAI",
-    description: "Get in touch with the SkillAI team for help, feedback, or partnership enquiries.",
+    title: "Contact SkillAI | Support & Partnerships",
+    description: "Contact the SkillAI team for account help, product feedback, or partnership enquiries. We are here to help.",
   },
   "/resume-builder": {
-    title: "Student Resume Builder | SkillAI",
-    description: "Build a structured student resume with photo-ready templates, verified details, a live preview, and Word or print-to-PDF export.",
+    title: "Online Resume Builder for Students | SkillAI",
+    description: "Create a student or early-career resume online. Organize education, projects, internships, and skills, preview templates, then export to Word or PDF.",
   },
   "/ai-interview": {
-    title: "AI Interview Practice for Students | SkillAI",
-    description: "Practice role-focused and behavioral interviews with SkillAI. Generate questions from your resume after consent and review your feedback.",
+    title: "AI Mock Interview Practice for Students | SkillAI",
+    description: "Prepare for job interviews with role-focused and behavioral practice questions. Complete a guided mock interview and review feedback on your answers.",
   },
   "/research-assistant": {
-    title: "Research Paper Finder and AI Assistant | SkillAI",
-    description: "Search scholarly papers by subject and explore an optional AI assistant for paper abstracts and research questions.",
+    title: "Research Paper Finder & Abstract Assistant | SkillAI",
+    description: "Find scholarly papers by subject, field, year, or publication type. Save searches and citations, and optionally ask AI about available abstracts.",
   },
   "/jd-match": {
-    title: "Resume Job Description Match and Tailoring | SkillAI",
-    description: "Compare resume text with a job description, review matching and missing terms, then optionally create a role-focused resume draft.",
+    title: "Resume Job Description Matcher | SkillAI",
+    description: "Compare your resume with a job description to find matching and missing skills or keywords. Review the fit and create a targeted resume draft.",
   },
 };

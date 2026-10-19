@@ -15,8 +15,11 @@ function setAttribute(html, pattern, replacement) {
 }
 
 for (const [route, page] of Object.entries(SEO_PAGES)) {
-  const canonicalUrl = `${SEO_SITE_URL}${route === "/" ? "/" : route}`;
+  const canonicalUrl = `${SEO_SITE_URL}${route === "/" ? "/" : `${route}/`}`;
   let html = template;
+  if (route !== "/") {
+    html = html.replace(/<link rel="preload" as="image" href="\/career-assessment\.svg" fetchpriority="high"\s*\/>\s*/, "");
+  }
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttribute(page.title)}</title>`);
   html = setAttribute(html, /<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeAttribute(page.description)}" />`);
   html = setAttribute(html, /<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${canonicalUrl}" />`);

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://albero-innovation.in/sitemap.xml
