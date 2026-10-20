@@ -114,17 +114,17 @@ const navItems = [
     label: "Resume",
     groups: [
       { heading: "RESUME", items: [
-        { label: "Resume Dashboard", to: "/resume/dashboard", description: "Your resume signals in one place.", icon: BarChart3 },
-        { label: "Resume Analyzer", to: "/resume/analyzer", description: "Review text extracted from your resume.", icon: FileText },
-        { label: "Resume Builder", to: "/resume/builder", description: "Build a clear, single-column resume.", icon: Layers3 },
+        { label: "Resume Dashboard", to: "/resume/dashboard", description: "Review your resume at a glance.", icon: BarChart3 },
+        { label: "Resume Analyzer", to: "/resume/analyzer", description: "Check your resume content.", icon: FileText },
+        { label: "Resume Builder", to: "/resume/builder", description: "Create a clear, polished resume.", icon: Layers3 },
       ] },
       { heading: "OPTIMIZATION", items: [
-        { label: "Optimize", to: "/resume/match-tailor", description: "Match a job description and tailor your resume.", icon: Target },
-        { label: "Job Match", to: "/resume/job-match", description: "Explore role fit from your skills.", icon: BriefcaseBusiness },
+        { label: "Optimize", to: "/resume/match-tailor", description: "Tailor your resume to a role.", icon: Target },
+        { label: "Job Match", to: "/resume/job-match", description: "Match your skills to a role.", icon: BriefcaseBusiness },
       ] },
       { heading: "CAREER INTELLIGENCE", items: [
-        { label: "Career Analysis", to: "/resume/career-analysis", description: "Review role skills and project evidence.", icon: GraduationCap },
-        { label: "Career Profile", to: "/resume/profile", description: "Your reusable professional identity.", icon: UserRound },
+        { label: "Career Analysis", to: "/resume/career-analysis", description: "Review your skills and projects.", icon: GraduationCap },
+        { label: "Career Profile", to: "/resume/profile", description: "Manage your career profile.", icon: UserRound },
       ] },
     ],
   },
@@ -329,7 +329,8 @@ function Navbar({ user, onLogout }) {
                 </button>
               </div>
               <div id={`mobile-${item.label.toLowerCase()}-nav-menu`} className={`mobile-nav-submenu${openDropdown === item.label ? " open" : ""}`}>
-                {item.groups ? item.groups.flatMap((group) => group.items).map((child) => <NavLink key={child.to} to={child.to} onPointerEnter={preloadResumeIntelligence} onFocus={preloadResumeIntelligence} onClick={preloadResumeIntelligence} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}><span>{child.label}<small>{child.description}</small></span></NavLink>) : item.children.map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>{child.label}</NavLink>)}
+                {item.groups ? item.groups.flatMap((group) => group.items)
+                  .map((child) => <NavLink key={child.to} to={child.to} onPointerEnter={preloadResumeIntelligence} onFocus={preloadResumeIntelligence} onClick={preloadResumeIntelligence} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}><span>{child.label}</span></NavLink>) : item.children.map((child) => <NavLink key={child.to} to={child.to} className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}>{child.label}</NavLink>)}
               </div>
             </div>
           ) : (
