@@ -53,6 +53,7 @@ import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../../shared/plan-pricing.j
 import { SEO_IMAGE_URL, SEO_PAGES, SEO_SITE_URL } from "../../shared/seo-pages.js";
 import { AppShell, Sidebar } from "./components/layout/ui.jsx";
 import CookieConsent, { openCookieSettings } from "./components/shared/CookieConsent.jsx";
+import { PrivacyPolicyPage, TermsOfServicePage } from "./features/legal/LegalPages.jsx";
 
 const InterviewExperiencePage = lazy(() => import("./features/interview/components/InterviewExperience"));
 const SkillAssessmentPage = lazy(() => import("./features/assessment/components/SkillAssessment"));
@@ -2793,8 +2794,8 @@ function Footer() {
 
       <div className="wrap footer-bottom">
         <span>© 2026 · All rights reserved · Albero Technologies</span>
-        <span>Privacy</span>
-        <span>Terms</span>
+        <Link to="/privacy">Privacy</Link>
+        <Link to="/terms">Terms</Link>
         <Link to="/contact">Contact us</Link>
         <span className="footer-credit">Website by <a href="https://www.albero.in/" target="_blank" rel="noopener noreferrer">Albero</a></span>
       </div>
@@ -2995,6 +2996,8 @@ function App() {
           <Route path="/roadmap" element={requireSession(<RoadmapPage />)} />
           <Route path="/resources" element={requireSession(<ResourcesPage />)} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
           <Route path="/pricing" element={<PricingPage user={session} onLogout={handleLogout} />} />
           <Route path="/consent" element={pendingUser ? <AccountDataConsentPage user={pendingUser} error={consentError} isSavingProfile={isSavingProfile} onAccept={handleConsentAccept} onDecline={() => void handleConsentDecline()} /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={session ? <Navigate to={requestedPath} replace /> : <LoginPage onLogin={handleLogin} />} />

@@ -14,6 +14,14 @@ export const SEO_PAGES = {
     title: "Contact SkillAI | Support & Partnerships",
     description: "Contact the SkillAI team for account help, product feedback, or partnership enquiries. We are here to help.",
   },
+  "/privacy": {
+    title: "Privacy Policy | SkillAI",
+    description: "Learn how SkillAI handles account details, content you submit, browser storage, and AI-assisted features.",
+  },
+  "/terms": {
+    title: "Terms of Service | SkillAI",
+    description: "Read the terms for using SkillAI learning, assessment, interview-practice, research, and career-support tools.",
+  },
   "/resume-builder": {
     title: "Online Resume Builder for Students | SkillAI",
     description: "Create a student or early-career resume online. Organize education, projects, internships, and skills, preview templates, then export to Word or PDF.",
