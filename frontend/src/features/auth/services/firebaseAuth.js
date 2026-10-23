@@ -1,18 +1,6 @@
-import { getApp, getApps, initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  OAuthProvider,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-} from "firebase/auth";
-
 let authInstance;
 
-function getFirebaseAuth() {
+async function getFirebaseAuth() {
   if (authInstance) return authInstance;
 
   const config = {
@@ -29,8 +17,12 @@ function getFirebaseAuth() {
     throw new Error("Social sign-in is not configured yet. Add the Firebase web app settings to .env.local.");
   }
 
-  const app = getApps().length ? getApp() : initializeApp(config);
-  authInstance = getAuth(app);
+  const [firebaseApp, firebaseAuth] = await Promise.all([
+    import("firebase/app"),
+    import("firebase/auth"),
+  ]);
+  const app = firebaseApp.getApps().length ? firebaseApp.getApp() : firebaseApp.initializeApp(config);
+  authInstance = firebaseAuth.getAuth(app);
   return authInstance;
 }
 
@@ -55,18 +47,26 @@ function toSkillAIUser(user) {
 }
 
 export async function signInWithEmailPassword(email, password) {
-  const { user } = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
+  const [{ signInWithEmailAndPassword }, auth] = await Promise.all([
+    import("firebase/auth"),
+    getFirebaseAuth(),
+  ]);
+  const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
   return toSkillAIUser(user);
 }
 
 export async function registerWithEmailPassword({ name, email, password }) {
-  const { user } = await createUserWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
+  const [{ createUserWithEmailAndPassword, updateProfile }, auth] = await Promise.all([
+    import("firebase/auth"),
+    getFirebaseAuth(),
+  ]);
+  const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
   await updateProfile(user, { displayName: name.trim() });
   return toSkillAIUser(user);
 }
 
 export async function getFirebaseIdToken() {
-  const auth = getFirebaseAuth();
+  const auth = await getFirebaseAuth();
   await auth.authStateReady();
   const user = auth.currentUser;
   if (!user) {
@@ -78,7 +78,10 @@ export async function getFirebaseIdToken() {
 }
 
 export async function signInWithSocialProvider(providerName) {
-  const auth = getFirebaseAuth();
+  const [{ GoogleAuthProvider, OAuthProvider, signInWithPopup }, auth] = await Promise.all([
+    import("firebase/auth"),
+    getFirebaseAuth(),
+  ]);
   let provider;
 
   if (providerName === "google") {
@@ -101,5 +104,9 @@ export async function signInWithSocialProvider(providerName) {
 }
 
 export async function signOutFirebaseUser() {
-  await signOut(getFirebaseAuth());
+  const [{ signOut }, auth] = await Promise.all([
+    import("firebase/auth"),
+    getFirebaseAuth(),
+  ]);
+  await signOut(auth);
 }
