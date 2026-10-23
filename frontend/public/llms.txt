@@ -4,10 +4,10 @@
 
 ## Public pages
 
-- [Home](https://albero-innovation.in/): Overview of SkillAI's learning and career tools.
-- [Plans and pricing](https://albero-innovation.in/pricing/): Compare available SkillAI plans.
-- [Contact](https://albero-innovation.in/contact/): Contact the team for help, feedback, or partnership enquiries.
-- [Student resume builder](https://albero-innovation.in/resume-builder/): Create and export a student or early-career resume.
-- [AI interview practice](https://albero-innovation.in/ai-interview/): Practice role-focused and behavioral interview questions.
-- [Research paper finder](https://albero-innovation.in/research-assistant/): Search scholarly papers and explore available abstracts.
-- [Resume job description matcher](https://albero-innovation.in/jd-match/): Compare resume content with a job description.
+- [Home](https://www.albero-innovation.in/): Overview of SkillAI's learning and career tools.
+- [Plans and pricing](https://www.albero-innovation.in/pricing/): Compare available SkillAI plans.
+- [Contact](https://www.albero-innovation.in/contact/): Contact the team for help, feedback, or partnership enquiries.
+- [Student resume builder](https://www.albero-innovation.in/resume-builder/): Create and export a student or early-career resume.
+- [AI interview practice](https://www.albero-innovation.in/ai-interview/): Practice role-focused and behavioral interview questions.
+- [Research paper finder](https://www.albero-innovation.in/research-assistant/): Search scholarly papers and explore available abstracts.
+- [Resume job description matcher](https://www.albero-innovation.in/jd-match/): Compare resume content with a job description.

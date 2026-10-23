@@ -1,4 +1,4 @@
-export const SEO_SITE_URL = "https://albero-innovation.in";
+export const SEO_SITE_URL = "https://www.albero-innovation.in";
 export const SEO_IMAGE_URL = `${SEO_SITE_URL}/career-learning-team.jpg`;
 
 export const SEO_PAGES = {
