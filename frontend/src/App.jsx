@@ -47,7 +47,7 @@ import {
   signOutFirebaseUser,
 } from "./features/auth/services/firebaseAuth";
 import { getDashboardActivity } from "./data/dashboardActivity";
-import { apiRequest } from "./services/api-client.js";
+import { apiRequest, apiUrl } from "./services/api-client.js";
 import { academicPaths } from "./data/academic-paths";
 import { PLAN_BILLING_TERMS, PLAN_PRICES_INR } from "../../shared/plan-pricing.js";
 import { SEO_IMAGE_URL, SEO_PAGES, SEO_SITE_URL } from "../../shared/seo-pages.js";
@@ -85,8 +85,35 @@ function getSeoPage(pathname) {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (SEO_PAGES[path]) return { ...SEO_PAGES[path], indexable: true, path };
 
-  const privatePage = ["/login", "/register", "/dashboard", "/interview/start", "/assessment/start", "/admin"]
+  const privatePage = [
+    "/login",
+    "/register",
+    "/dashboard",
+    "/domains",
+    "/interview",
+    "/interview/start",
+    "/assessment",
+    "/assessment/start",
+    "/research",
+    "/research/maker",
+    "/roadmap",
+    "/resources",
+    "/admin",
+    "/consent",
+  ]
     .includes(path) || path === "/resume" || path.startsWith("/resume/");
+
+  if (privatePage) {
+    if (path === "/resume/builder" || path.startsWith("/resume/")) {
+      return {
+        title: "",
+        description: "Manage your resume, improve your profile, and build your career workspace in SkillAI.",
+        indexable: false,
+        path,
+      };
+    }
+  }
+
   return {
     title: privatePage ? "Your SkillAI Workspace" : "Page Not Found | SkillAI",
     description: "SkillAI helps learners assess skills and plan practical next steps.",
@@ -115,8 +142,7 @@ const navItems = [
     label: "Resume",
     groups: [
       { heading: "RESUME", items: [
-        { label: "Resume Dashboard", to: "/resume/dashboard", description: "Review your resume at a glance.", icon: BarChart3 },
-        { label: "Resume Analyzer", to: "/resume/analyzer", description: "Check your resume content.", icon: FileText },
+        { label: "Resume Hub", to: "/resume/dashboard", description: "Upload, review, and analyze your resume in one place.", icon: FileText },
         { label: "Resume Builder", to: "/resume/builder", description: "Create a clear, polished resume.", icon: Layers3 },
       ] },
       { heading: "OPTIMIZATION", items: [
@@ -180,8 +206,7 @@ const resourceCards = [
 const workspaceNavigation = [
   { label: "WORKSPACE", items: [{ label: "Student Dashboard", to: "/dashboard" }] },
   { label: "RESUME", items: [
-    { label: "Resume Dashboard", to: "/resume/dashboard" },
-    { label: "Resume Analyzer", to: "/resume/analyzer" },
+    { label: "Resume Hub", to: "/resume/dashboard" },
     { label: "Resume Builder", to: "/resume/builder" },
   ] },
   { label: "OPTIMIZATION", items: [
@@ -2058,16 +2083,41 @@ function ResourcesPage() {
 }
 
 function ContactPage() {
-  const handleSubmit = (event) => {
+  const [submitState, setSubmitState] = useState({ status: "idle", message: "" });
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    const name = String(values.get("name") || "").trim();
-    const email = String(values.get("email") || "").trim();
-    const topic = String(values.get("topic") || "General enquiry");
-    const message = String(values.get("message") || "").trim();
-    const subject = encodeURIComponent(`SkillAI contact: ${topic}`);
-    const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nTopic: ${topic}\n\n${message}`);
-    window.location.href = `mailto:Business@alberotechnologies.com?subject=${subject}&body=${body}`;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const payload = {
+      name: String(values.get("name") || "").trim(),
+      email: String(values.get("email") || "").trim(),
+      topic: String(values.get("topic") || ""),
+      message: String(values.get("message") || "").trim(),
+    };
+    setSubmitState({ status: "sending", message: "" });
+
+    try {
+      const response = await fetch(apiUrl("/api/contact"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result.savedToDatabase !== true) {
+        throw new Error(result.error || "Your message could not be sent.");
+      }
+      form.reset();
+      setSubmitState({
+        status: "success",
+        message: "Your message has been sent and saved successfully.",
+      });
+    } catch (error) {
+      setSubmitState({
+        status: "error",
+        message: error.message || "Your message could not be sent. Please email Business@alberotechnologies.com directly.",
+      });
+    }
   };
 
   return (
@@ -2099,7 +2149,7 @@ function ContactPage() {
           <section className="contact-form-card" aria-labelledby="contact-form-title">
             <div className="contact-form-heading">
               <span className="contact-form-mark"><Send size={18} /></span>
-              <div><h2 id="contact-form-title">Send us a message</h2><p>Share a few details and your email app will open with the message addressed to our team.</p></div>
+              <div><h2 id="contact-form-title">Send us a message</h2><p>Share a few details and our team will get back to you.</p></div>
             </div>
             <form className="contact-form" onSubmit={handleSubmit}>
               <div className="contact-form-row">
@@ -2116,8 +2166,14 @@ function ContactPage() {
                 </select>
               </label>
               <label className="field"><span>Your message</span><textarea className="auth-input contact-message-input" name="message" rows="5" placeholder="Tell us how we can help..." required /></label>
-              <button type="submit" className="primary-button contact-submit">Continue to email <ArrowRight size={17} /></button>
-              <p className="contact-form-note">Your message is not sent from this page. Review it in your email app and press Send.</p>
+              <button type="submit" className="primary-button contact-submit" disabled={submitState.status === "sending"}>
+                {submitState.status === "sending" ? "Sending..." : "Send message"} <ArrowRight size={17} />
+              </button>
+              {submitState.message && (
+                <p className="contact-form-note" role={submitState.status === "error" ? "alert" : "status"}>
+                  {submitState.message}
+                </p>
+              )}
             </form>
           </section>
         </div>

@@ -1,13 +1,26 @@
 let authInstance;
 
+function cleanFirebaseConfigValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function withAuthDomainGuidance(error) {
+  if (error?.code !== "auth/unauthorized-domain") return error;
+  const hostname = typeof window === "undefined" ? "this hostname" : window.location.hostname;
+  return Object.assign(
+    new Error(`Firebase sign-in is not enabled for "${hostname}". In Firebase Console, open Authentication → Settings → Authorized domains and add this hostname without the protocol or port.`),
+    { code: error.code },
+  );
+}
+
 async function getFirebaseAuth() {
   if (authInstance) return authInstance;
 
   const config = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    apiKey: cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_API_KEY),
+    authDomain: cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+    projectId: cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+    appId: cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_APP_ID),
   };
   const missingConfig = Object.entries(config)
     .filter(([, value]) => !value || /^your[_-]/i.test(value))
@@ -27,13 +40,22 @@ async function getFirebaseAuth() {
 }
 
 export function isFirebaseConfigured() {
-  return Boolean(
-    import.meta.env.VITE_FIREBASE_API_KEY
-    && import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
-    && import.meta.env.VITE_FIREBASE_PROJECT_ID
-    && import.meta.env.VITE_FIREBASE_APP_ID
-    && !/^your[_-]/i.test(import.meta.env.VITE_FIREBASE_API_KEY),
+  const firebaseEnabled = cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_ENABLE).toLowerCase();
+  const explicitDisabled = ["false", "0", "off", "no"].includes(firebaseEnabled);
+  if (explicitDisabled) return false;
+
+  const apiKey = cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_API_KEY);
+  const hasConfig = Boolean(
+    apiKey
+    && cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN)
+    && cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_PROJECT_ID)
+    && cleanFirebaseConfigValue(import.meta.env.VITE_FIREBASE_APP_ID)
+    && !/^your[_-]/i.test(apiKey),
   );
+
+  if (!hasConfig) return false;
+  if (firebaseEnabled === "true" || firebaseEnabled === "1" || firebaseEnabled === "yes" || firebaseEnabled === "on") return true;
+  return import.meta.env.PROD;
 }
 
 function toSkillAIUser(user) {
@@ -51,8 +73,12 @@ export async function signInWithEmailPassword(email, password) {
     import("firebase/auth"),
     getFirebaseAuth(),
   ]);
-  const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
-  return toSkillAIUser(user);
+  try {
+    const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+    return toSkillAIUser(user);
+  } catch (error) {
+    throw withAuthDomainGuidance(error);
+  }
 }
 
 export async function registerWithEmailPassword({ name, email, password }) {
@@ -60,9 +86,13 @@ export async function registerWithEmailPassword({ name, email, password }) {
     import("firebase/auth"),
     getFirebaseAuth(),
   ]);
-  const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  await updateProfile(user, { displayName: name.trim() });
-  return toSkillAIUser(user);
+  try {
+    const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    await updateProfile(user, { displayName: name.trim() });
+    return toSkillAIUser(user);
+  } catch (error) {
+    throw withAuthDomainGuidance(error);
+  }
 }
 
 export async function getFirebaseIdToken() {
@@ -99,8 +129,12 @@ export async function signInWithSocialProvider(providerName) {
     throw new Error("That sign-in provider is not supported.");
   }
 
-  const result = await signInWithPopup(auth, provider);
-  return toSkillAIUser(result.user);
+  try {
+    const result = await signInWithPopup(auth, provider);
+    return toSkillAIUser(result.user);
+  } catch (error) {
+    throw withAuthDomainGuidance(error);
+  }
 }
 
 export async function signOutFirebaseUser() {

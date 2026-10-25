@@ -1,6 +1,7 @@
 import { authenticateRequest } from "../billing/billing-api.js";
 import { handleCors } from "../../middleware/cors.js";
 import { setBoundedMapEntry } from "../../middleware/bounded-map.js";
+import { validateResumeText } from "../../../../shared/resume-validation.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
 const MAX_RESUME_LENGTH = 12000;
@@ -52,6 +53,8 @@ export function validateResumeAssistantPayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "Resume details are required.";
   if (!["analyze", "match-jobs", "tailor", "skill-gaps"].includes(payload.action)) return "Choose a valid resume AI task.";
   if (!validString(payload.resumeText, 80, MAX_RESUME_LENGTH)) return `Add a resume with at least 80 readable characters (maximum ${MAX_RESUME_LENGTH}).`;
+  const resumeValidation = validateResumeText(payload.resumeText);
+  if (!resumeValidation.valid) return resumeValidation.error;
 
   if (payload.action === "match-jobs") {
     if (!Array.isArray(payload.jobs) || payload.jobs.length < 1 || payload.jobs.length > MAX_JOB_COUNT) {

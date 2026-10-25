@@ -1,17 +1,75 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 export function AppShell({ sidebar, children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStart = useRef(null);
   const location = useLocation();
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!isResizing) return undefined;
+
+    const handlePointerMove = (event) => {
+      if (event.pointerId !== resizeStart.current?.pointerId) return;
+      const nextWidth = resizeStart.current.width + event.clientX - resizeStart.current.x;
+      setSidebarWidth(Math.min(400, Math.max(200, nextWidth)));
+    };
+    const stopResizing = (event) => {
+      if (event.pointerId !== resizeStart.current?.pointerId) return;
+      resizeStart.current = null;
+      setIsResizing(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+    };
+  }, [isResizing]);
+
+  const startResizing = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    resizeStart.current = {
+      x: event.clientX,
+      width: sidebarWidth,
+      pointerId: event.pointerId,
+    };
+    setIsResizing(true);
+  };
+
+  const handleResizeKeyDown = (event) => {
+    const adjustment = event.shiftKey ? 32 : 12;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setSidebarWidth((width) => Math.max(200, width - adjustment));
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setSidebarWidth((width) => Math.min(400, width + adjustment));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      setSidebarWidth(200);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setSidebarWidth(400);
+    }
+  };
+
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell${isResizing ? " is-resizing" : ""}`}
+      style={{ "--sidebar-width": `${sidebarWidth}px` }}
+    >
       <button
         className="app-drawer-toggle"
         type="button"
@@ -32,6 +90,18 @@ export function AppShell({ sidebar, children }) {
       )}
       <aside id="app-sidebar" className={`app-sidebar${drawerOpen ? " is-open" : ""}`}>
         {sidebar}
+        <div
+          className="app-sidebar-resize-handle"
+          role="separator"
+          aria-label="Resize navigation sidebar"
+          aria-orientation="vertical"
+          aria-valuemin={200}
+          aria-valuemax={400}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          onPointerDown={startResizing}
+          onKeyDown={handleResizeKeyDown}
+        />
       </aside>
       <div className="app-shell-main">{children}</div>
     </div>

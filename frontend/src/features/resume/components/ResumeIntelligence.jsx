@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ArrowRight,
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
+  Eye,
   FileCheck2,
   FileText,
   FileUp,
@@ -18,6 +19,9 @@ import {
   Lightbulb,
   ListChecks,
   Mail,
+  Maximize2,
+  Minimize2,
+  Minus,
   Phone,
   Plus,
   Search,
@@ -26,10 +30,22 @@ import {
   Target,
   Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { apiRequest } from "../../../services/api-client.js";
 import { getPhotoBytes, resizeResumePhoto } from "../services/resume-photo.js";
+import {
+  analyzeResumeText,
+  extractPdfResumeText,
+  sectionExists,
+  SECTION_HEADINGS,
+} from "../services/resume-analysis.js";
+import { isAtsFriendlyTemplate } from "../services/resume-template-ats.js";
+import { parseResumeBuilderText } from "../services/resume-builder-import.js";
+import { parseResumeContentLine } from "../services/resume-formatting.js";
+import { adjustResumeSectionSpacing, getResumeSectionSpacing } from "../services/resume-section-spacing.js";
+import { validateResumeText } from "../../../../../shared/resume-validation.js";
 
 const PROFILE_KEY = "skillai-resume-profile";
 const RESUME_KEY = "skillai-resume-text";
@@ -78,17 +94,6 @@ const ROLES = [
 const SKILL_CATALOG = [...new Set(ROLES.flatMap((role) => role.skills))];
 const SECTORS = [...new Set(ROLES.map((role) => role.sector))];
 const SECTIONS = ["Summary", "Experience", "Education", "Projects", "Skills", "Certifications", "Achievements", "Publications", "Internships", "Training", "Languages"];
-const SECTION_HEADINGS = {
-  summary: ["summary", "professional summary", "career summary", "profile", "profile summary", "objective", "about"],
-  experience: ["experience", "work experience", "professional experience", "employment", "employment history", "work history"],
-  education: ["education", "academic", "academic background"],
-  projects: ["projects", "project", "personal projects"],
-  skills: ["skills", "technical skills", "competencies"],
-  certifications: ["certifications", "certificates"],
-  achievements: ["achievements", "awards", "honors"],
-  publications: ["publications", "papers"],
-};
-
 function readStored(key, fallback) {
   try {
     const value = window.localStorage.getItem(key);
@@ -110,11 +115,6 @@ async function requestCloudResume(method, resumeText) {
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "The resume could not be synced to your account.");
   return result;
-}
-
-function sectionExists(text, section) {
-  const headings = SECTION_HEADINGS[section] || [section];
-  return headings.some((heading) => new RegExp(`(^|\\n)\\s*${heading}\\s*:?\\s*(\\n|$)`, "im").test(text));
 }
 
 function addMissingSkillsToResumeDraft(draft, skills) {
@@ -160,67 +160,9 @@ function addMissingSkillsToResumeDraft(draft, skills) {
   return { draft: lines.join("\n").trim(), addedSkills: missingSkills };
 }
 
-function scanResume(text) {
-  if (!text.trim()) return null;
-  const sections = Object.keys(SECTION_HEADINGS);
-  const presentSections = sections.filter((section) => sectionExists(text, section));
-  const foundSkills = SKILL_CATALOG.filter((skill) => includesTerm(text, skill));
-  const quantifiedClaims = [...text.matchAll(/\b(?:increased|improved|reduced|managed|served|supported|achieved|delivered|grew)\b[^.\n]{0,100}\b\d+(?:\.\d+)?%?/gi)]
-    .map((match) => match[0].trim());
-  const bullets = text.split(/\r?\n/).filter((line) => /^\s*[•*-]\s+/.test(line));
-  const actionBullets = bullets.filter((line) => /^\s*[•*-]\s+(?:built|created|developed|led|managed|improved|designed|analyzed|implemented|delivered|reduced|increased|launched)\b/i.test(line));
-  const hasEmail = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text);
-  const hasPhone = text.split(/\r?\n/).some((line) => {
-    const digits = line.replace(/\D/g, "");
-    return digits.length >= 10 && digits.length <= 15 && /(?:\+?\d[\d\s().-]{8,}\d)/.test(line);
-  });
-  const scoreFactors = [
-    {
-      label: "Standard section headings",
-      score: Math.round((presentSections.length / sections.length) * 30),
-      max: 30,
-      detail: `${presentSections.length} of ${sections.length} detected`,
-    },
-    {
-      label: "Contact details",
-      score: (hasEmail ? 10 : 0) + (hasPhone ? 10 : 0),
-      max: 20,
-      detail: `${hasEmail ? "Email found" : "Email not found"} · ${hasPhone ? "Phone found" : "Phone not found"}`,
-    },
-    {
-      label: "Recognized skill terms",
-      score: Math.round((Math.min(foundSkills.length, 8) / 8) * 20),
-      max: 20,
-      detail: `${foundSkills.length} catalog terms · up to 8 count`,
-    },
-    {
-      label: "Bullet structure",
-      score: bullets.length ? 5 + Math.round((actionBullets.length / bullets.length) * 10) : 0,
-      max: 15,
-      detail: `${actionBullets.length} of ${bullets.length} start with a listed action verb`,
-    },
-    {
-      label: "Measurable-result phrases",
-      score: Math.min(quantifiedClaims.length, 3) * 5,
-      max: 15,
-      detail: `${quantifiedClaims.length} outcome-and-number patterns found · up to 3 count`,
-    },
-  ];
-  const atsReadinessScore = scoreFactors.reduce((total, factor) => total + factor.score, 0);
-  return {
-    foundSkills,
-    presentSections,
-    missingSections: sections.filter((section) => !presentSections.includes(section)),
-    quantifiedClaims,
-    bullets,
-    actionBullets,
-    atsReadiness: {
-      score: atsReadinessScore,
-      factors: scoreFactors,
-      label: atsReadinessScore >= 80 ? "Strong signals" : atsReadinessScore >= 60 ? "Good signals" : atsReadinessScore >= 40 ? "Developing" : "Needs attention",
-    },
-    wordCount: text.trim().split(/\s+/).length,
-  };
+function scanResume(text, extraction = {}) {
+  if (!validateResumeText(text).valid) return null;
+  return analyzeResumeText(text, { ...extraction, skillCatalog: SKILL_CATALOG });
 }
 
 function includesTerm(text, term) {
@@ -269,7 +211,7 @@ function extractMatchKeywords(text, excludedSkills = []) {
 }
 
 function buildJobMatchReport(resumeText, jobDescription, role) {
-  if (resumeText.trim().length < 80 || jobDescription.trim().length < 40 || !role) return null;
+  if (!validateResumeText(resumeText).valid || jobDescription.trim().length < 40 || !role) return null;
 
   const jdSkills = SKILL_CATALOG.filter((skill) => includesTerm(jobDescription, skill));
   const roleSkills = role.skills;
@@ -601,30 +543,15 @@ async function readResumeFile(file) {
     const documentTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
     try {
       const pdf = await documentTask.promise;
-      const pages = [];
-      for (let number = 1; number <= pdf.numPages; number += 1) {
-        const page = await pdf.getPage(number);
-        const content = await page.getTextContent();
-        let pageText = "";
-        let previousY = null;
-        let previousEndX = null;
-        for (const item of content.items) {
-          if (!("str" in item) || !item.str) continue;
-          const x = item.transform?.[4];
-          const y = item.transform?.[5];
-          if (typeof y === "number" && typeof previousY === "number" && Math.abs(y - previousY) > 3) {
-            pageText = `${pageText.trimEnd()}\n`;
-          } else if (pageText && typeof x === "number" && typeof previousEndX === "number" && x > previousEndX + 1 && !pageText.endsWith(" ")) {
-            pageText += " ";
-          }
-          pageText += item.str;
-          if (item.hasEOL) pageText += "\n";
-          previousY = y;
-          previousEndX = typeof x === "number" && typeof item.width === "number" ? x + item.width : x;
-        }
-        pages.push(pageText);
+      const extracted = await extractPdfResumeText(pdf);
+      if (!extracted.text) throw new Error(extracted.extraction.warning);
+      return extracted;
+    } catch (error) {
+      if (/password/i.test(error.name || "") || /password/i.test(error.message || "")) {
+        throw new Error("This PDF is password-protected. Remove the password or upload an unlocked resume.");
       }
-      return pages.join("\n").trim();
+      if (/no selectable text|OCR is required/i.test(error.message || "")) throw error;
+      throw new Error(`The PDF could not be read. It may be corrupted or use an unsupported encoding. ${error.message || ""}`.trim());
     } finally {
       await documentTask.destroy();
     }
@@ -632,9 +559,9 @@ async function readResumeFile(file) {
   if (/\.(doc|docx)$/i.test(file.name)) {
     const mammothModule = await import("mammoth/mammoth.browser");
     const mammoth = mammothModule.default || mammothModule;
-    return (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value.trim();
+    return { text: (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value.trim(), extraction: {} };
   }
-  return (await file.text()).trim();
+  return { text: (await file.text()).trim(), extraction: {} };
 }
 
 function saveBlob(blob, filename) {
@@ -662,81 +589,77 @@ function normalizeResumeHeading(line) {
     .toLowerCase();
 }
 
-function escapeHtml(text) {
-  return text.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;",
-  })[character]);
+function ResumeContent({ content, sectionKey }) {
+  const lines = String(content || "").split(/\r?\n/);
+  const isSkills = sectionKey.toLowerCase() === "skills";
+
+  return (
+    <div className={`ri-resume-content-lines${isSkills ? " ri-resume-content-skills" : ""}`}>
+      {lines.map((line, index) => {
+        if (!line.trim()) {
+          return isSkills ? null : <span aria-hidden="true" className="ri-resume-content-spacer" key={`space-${index}`} />;
+        }
+        return (
+          <p className="ri-resume-content-line" key={`line-${index}`}>
+            {parseResumeContentLine(line, sectionKey).map((part, partIndex) => (
+              part.bold
+                ? <strong key={`part-${partIndex}`}>{part.text}</strong>
+                : <span key={`part-${partIndex}`}>{part.text}</span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function ResumeSectionHeading({ label, spacing, onSpacingChange, onDoubleClick }) {
+  if (typeof onSpacingChange !== "function") return <h3 onDoubleClick={onDoubleClick}>{label}</h3>;
+  return (
+    <div className="ri-resume-section-title-row">
+      <h3 onDoubleClick={onDoubleClick}>{label}</h3>
+      <div className="ri-resume-section-spacing-controls" aria-label={`${label} section spacing`}>
+        <button type="button" onClick={() => onSpacingChange(-1)} aria-label={`Reduce space above ${label}`} title="Reduce space above this section" disabled={spacing <= -12}>
+          <Minus size={12} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => onSpacingChange(1)} aria-label={`Increase space above ${label}`} title="Increase space above this section" disabled={spacing >= 36}>
+          <Plus size={12} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function normalizeHexColor(color, fallback = "#29483E") {
   return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
 }
 
-function buildPrintableResume(title, text, headingColor) {
-  const safeHeadingColor = normalizeHexColor(headingColor);
-  const darkHeadingColor = safeHeadingColor;
-  const headingNames = new Set(
-    [...SECTIONS, ...Object.values(SECTION_HEADINGS).flat(), "JD Keywords to Review", "JD Skills to Verify"]
-      .map(normalizeResumeHeading),
-  );
-  const content = [];
-  let bullets = [];
-  const flushBullets = () => {
-    if (!bullets.length) return;
-    content.push(`<ul>${bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
-    bullets = [];
-  };
-
-  resumeTextToParagraphs(text).forEach((line, index) => {
-    const heading = normalizeResumeHeading(line);
-    const bullet = line.match(/^[•*-]\s+(.+)$/);
-    if (index === 0) {
-      flushBullets();
-      content.push(`<h1>${escapeHtml(line)}</h1>`);
-    } else if (headingNames.has(heading)) {
-      flushBullets();
-      content.push(`<h2>${escapeHtml(line.replace(/^#+\s*/, "").replace(/[*_`]/g, "").replace(/[:：]\s*$/, ""))}</h2>`);
-    } else if (bullet) {
-      bullets.push(bullet[1]);
-    } else {
-      flushBullets();
-      content.push(`<p>${escapeHtml(line)}</p>`);
+function getResumeContactHref(key, value) {
+  const contact = String(value || "").trim();
+  if (!contact) return "";
+  if (key === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) ? `mailto:${contact}` : "";
+  if (key === "phone") {
+    const phone = contact.replace(/[^\d+]/g, "");
+    return phone.replace(/\D/g, "").length >= 8 ? `tel:${phone}` : "";
+  }
+  if (key === "linkedin" || key === "github") {
+    try {
+      const url = new URL(/^https?:\/\//i.test(contact) ? contact : `https://${contact}`);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
     }
-  });
-  flushBullets();
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    @page { size: A4; margin: 16mm 17mm; }
-    * { box-sizing: border-box; }
-    body { margin: 0; color: #24332f; font: 10.5pt/1.5 Arial, Helvetica, sans-serif; overflow-wrap: anywhere; }
-    h1 { margin: 0 0 9pt; padding: 0 0 7pt; border-bottom: 2pt solid ${safeHeadingColor}; color: ${darkHeadingColor}; font-size: 22pt; line-height: 1.2; }
-    h2 { margin: 15pt 0 6pt; padding-bottom: 3pt; border-bottom: .75pt solid ${safeHeadingColor}66; color: ${safeHeadingColor}; font-size: 12pt; line-height: 1.25; page-break-after: avoid; break-after: avoid; }
-    p { margin: 0 0 5pt; }
-    ul { margin: 0 0 7pt; padding-left: 19pt; }
-    li { margin: 0 0 3pt; padding-left: 2pt; }
-    @media screen { body { max-width: 210mm; margin: 20px auto; padding: 16mm 17mm; box-shadow: 0 2px 18px #0002; } }
-  </style>
-</head>
-<body>${content.join("\n")}
-<script>window.addEventListener("load", () => window.setTimeout(() => window.print(), 250));</script>
-</body>
-</html>`;
+  }
+  return "";
 }
 
-async function downloadDocx(title, text, template, sectionNames, accentColor, photoDataUrl) {
-  const { BorderStyle, Document, HeadingLevel, ImageRun, Packer, Paragraph, ShadingType, TabStopType, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+async function downloadDocx(title, text, template, sectionNames, accentColor, photoDataUrl, sectionSpacing = {}) {
+  const { BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, Packer, Paragraph, ShadingType, TabStopType, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
   const templateLayouts = {
     classic: { alignment: "left", font: "Arial", titleSize: 34, headingSize: 24, gap: 140, leftMargin: 900 },
+    "academic-cv": { alignment: "center", font: "Georgia", titleSize: 44, headingSize: 22, bodySize: 21, gap: 70, leftMargin: 900 },
+    "modern-clean": { alignment: "left", font: "Arial", titleSize: 44, headingSize: 22, bodySize: 21, gap: 85, leftMargin: 900 },
+    "classic-serif": { alignment: "center", font: "Georgia", titleSize: 44, headingSize: 22, bodySize: 21, gap: 90, leftMargin: 900 },
     modern: { alignment: "left", font: "Arial", titleSize: 38, headingSize: 25, gap: 150, leftMargin: 900 },
     compact: { alignment: "left", font: "Arial", titleSize: 30, headingSize: 22, gap: 70, leftMargin: 720 },
     executive: { alignment: "center", font: "Arial", titleSize: 40, headingSize: 25, gap: 160, leftMargin: 1080 },
@@ -785,13 +708,17 @@ async function downloadDocx(title, text, template, sectionNames, accentColor, ph
       headerLines.push(line);
     }
   });
-  const makeParagraph = (line, { isName = false, isSection = false, inSidebar = false } = {}) => {
+  const makeParagraph = (line, { isName = false, isSection = false, inSidebar = false, sectionTitle = "" } = {}) => {
     const isClassic = template === "classic";
+    const isSkillsSection = sectionTitle.toLowerCase().includes("skills");
+    const spacingBefore = isSection ? getResumeSectionSpacing(sectionSpacing, line) : 0;
     const bulletMatch = line.match(/^\s*[•*-]\s+/);
     const paragraphText = bulletMatch ? line.slice(bulletMatch[0].length) : line;
     const titleColor = headingColor;
-    const sectionBorder = template === "clean"
+    const sectionBorder = ["clean", "academic-cv", "classic-serif"].includes(template)
       ? { bottom: { color: "D9E2D2", size: 4, space: 4, style: BorderStyle.SINGLE } }
+      : template === "modern-clean"
+        ? { bottom: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 5, style: BorderStyle.SINGLE } }
       : ["sidebar", "timeline"].includes(template)
         ? { left: { color: accentColor.slice(1).toUpperCase(), size: 12, space: 5, style: BorderStyle.SINGLE } }
         : ["modern", "topline"].includes(template)
@@ -799,28 +726,54 @@ async function downloadDocx(title, text, template, sectionNames, accentColor, ph
           : undefined;
     const frameBorder = { top: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, bottom: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, left: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE }, right: { color: accentColor.slice(1).toUpperCase(), size: 6, space: 6, style: BorderStyle.SINGLE } };
     const [leftText, rightText] = paragraphText.split("\t");
+    const fontSize = isName
+      ? Math.max(layout.titleSize, 40)
+      : isSection
+        ? ["academic-cv", "modern-clean", "classic-serif"].includes(template) ? layout.headingSize : Math.max(layout.headingSize, 26)
+        : layout.bodySize || 24;
+    const textRunOptions = {
+      font: layout.font,
+      size: fontSize,
+    };
+    const contactParts = !isName && !isSection && !sectionTitle
+      ? leftText.split(/\s+\|\s+/).map((part) => part.match(/^(Phone|Email|LinkedIn|GitHub):\s*(.+)$/i))
+      : [];
+    const textRuns = contactParts.length && contactParts.every(Boolean)
+      ? contactParts.flatMap((match, index) => {
+        const [, label, value] = match;
+        const href = getResumeContactHref(label.toLowerCase(), value);
+        return [
+          ...(index ? [new TextRun({ text: " | ", ...textRunOptions })] : []),
+          href
+            ? new ExternalHyperlink({
+              link: href,
+              children: [new TextRun({ text: `${label}: ${value}`, style: "Hyperlink", ...textRunOptions })],
+            })
+            : new TextRun({ text: `${label}: ${value}`, ...textRunOptions }),
+        ];
+      })
+      : parseResumeContentLine(leftText, sectionTitle).map((part) => new TextRun({
+        text: part.text,
+        bold: isName || isSection || part.bold,
+        color: isName && (isClassic || template === "banner") ? "FFFFFF" : isName && ["monochrome", "classic-serif", "academic-cv"].includes(template) ? "111111" : isName || isSection ? titleColor : "1B2A22",
+        ...textRunOptions,
+      }));
     return new Paragraph({
       heading: isName ? HeadingLevel.TITLE : isSection ? HeadingLevel.HEADING_1 : undefined,
       bullet: bulletMatch && !isName && !isSection ? { level: 0 } : undefined,
-      alignment: ["executive", "elegant", "stacked"].includes(template) && !isSection ? "center" : undefined,
+      alignment: ["executive", "elegant", "stacked", "academic-cv", "classic-serif"].includes(template) && !isSection ? "center" : undefined,
       tabStops: rightText ? [{ type: TabStopType.RIGHT, position: ["sidebar", "split", "portfolio"].includes(template) ? 6200 : 9000 }] : undefined,
       indent: bulletMatch ? { left: 360, hanging: 180 } : inSidebar && template === "sidebar" ? { left: 120 } : undefined,
       border: isSection ? sectionBorder : template === "framed" ? frameBorder : isName && template === "topline" ? { top: { color: accentColor.slice(1).toUpperCase(), size: 18, space: 8, style: BorderStyle.SINGLE } } : undefined,
       shading: isName && isClassic ? { type: ShadingType.CLEAR, fill: "35434A" } : isName && template === "banner" ? { type: ShadingType.CLEAR, fill: accentColor.slice(1).toUpperCase() } : isSection && template === "infographic" ? { type: ShadingType.CLEAR, fill: "EEF3F7" } : undefined,
       children: [
         ...(isName && photoBytes ? [new ImageRun({ data: photoBytes, type: "jpg", transformation: { width: 72, height: 90 } })] : []),
-        new TextRun({
-          text: rightText ? leftText : paragraphText,
-          bold: isName || isSection,
-          color: isName && (isClassic || template === "banner") ? "FFFFFF" : isName && template === "monochrome" ? "111111" : isName || isSection ? titleColor : "1B2A22",
-          font: layout.font,
-          size: isName ? Math.max(layout.titleSize, 40) : isSection ? Math.max(layout.headingSize, 26) : 24,
-        }),
+        ...textRuns,
         ...(rightText ? [new TextRun({ text: `\t${rightText}`, font: layout.font, size: 22 })] : []),
       ],
       keepNext: isSection,
       keepLines: true,
-      spacing: { before: isSection ? 180 : 0, after: isSection ? 100 : layout.gap },
+      spacing: { before: isSection ? Math.max(0, 180 + spacingBefore * 20) : 0, after: isSection ? 100 : isSkillsSection ? 35 : layout.gap },
     });
   };
   const isSidebarSection = (section) => template === "portfolio"
@@ -828,7 +781,7 @@ async function downloadDocx(title, text, template, sectionNames, accentColor, ph
     : /^(skills|education|certifications?|languages?|training)$/i.test(section.title);
   const makeSectionParagraphs = (section, inSidebar = false) => [
     makeParagraph(section.title, { isSection: true, inSidebar }),
-    ...section.lines.map((line) => makeParagraph(line, { inSidebar })),
+    ...section.lines.map((line) => makeParagraph(line, { inSidebar, sectionTitle: section.title })),
   ];
   const children = headerLines.map((line, index) => makeParagraph(line, { isName: index === 0 }));
   if (["sidebar", "split", "portfolio"].includes(template) && sections.length) {
@@ -847,7 +800,6 @@ async function downloadDocx(title, text, template, sectionNames, accentColor, ph
       rows: [new TableRow({ children: [
         new TableCell({
           width: { size: 2600, type: WidthType.DXA },
-          shading: { type: ShadingType.CLEAR, fill: template === "portfolio" ? "F2EBE5" : template === "split" ? "EEF3F7" : "E8EDEF" },
           children: cellChildren(sidebarSections, true),
         }),
         new TableCell({
@@ -861,7 +813,7 @@ async function downloadDocx(title, text, template, sectionNames, accentColor, ph
     sections.forEach((section) => children.push(...makeSectionParagraphs(section)));
   }
   const document = new Document({
-    sections: [{ properties: { page: { margin: { top: 720, right: layout.leftMargin, bottom: 720, left: layout.leftMargin } } }, children }],
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 680, right: 680, bottom: 680, left: 680 } } }, children }],
     title,
   });
   saveBlob(await Packer.toBlob(document), `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.docx`);
@@ -884,9 +836,11 @@ function ResumeUpload({ onRead, status, busy, error, compact = false, hasResume 
     if (!file) return;
     onRead(null, "Reading resume locally…", true, "");
     try {
-      const text = await readResumeFile(file);
+      const { text, extraction } = await readResumeFile(file);
       if (!text) throw new Error("No readable text was found in that file.");
-      onRead(text, `${file.name} · ${text.split(/\s+/).length} words extracted on this device.`, false, "");
+      const validation = validateResumeText(text);
+      if (!validation.valid) throw new Error(validation.error);
+      onRead(text, `${file.name} · ${text.split(/\s+/).length} words extracted on this device.`, false, "", extraction);
     } catch (readError) {
       onRead(null, "", false, readError.message || "The resume could not be read.");
     }
@@ -940,6 +894,7 @@ function JobSearch({ analysis, resumeText = "" }) {
   const [keywordsEdited, setKeywordsEdited] = useState(false);
   const [locationMode, setLocationMode] = useState("any");
   const [useAIMatching, setUseAIMatching] = useState(false);
+  const hasValidResume = Boolean(analysis);
   const candidateExperienceYears = useMemo(() => summarizeExperienceYears(resumeText, "max"), [resumeText]);
   const [location, setLocation] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -971,7 +926,7 @@ function JobSearch({ analysis, resumeText = "" }) {
   const runSearch = async () => {
     setError("");
     const terms = [...new Set(keywords.split(/[,;\n]+/).map((term) => term.trim()).filter(Boolean))];
-    if (!terms.length && !(useAIMatching && resumeText.trim().length >= 80 && resumeText.length <= 12000)) {
+    if (!terms.length && !(useAIMatching && hasValidResume && resumeText.length <= 12000)) {
       setError("Add at least one keyword, or upload a resume with recognizable skills to prefill this field.");
       return;
     }
@@ -1026,7 +981,7 @@ function JobSearch({ analysis, resumeText = "" }) {
       let matching;
       let matchingMode = "keyword";
       setAiError("");
-      if (useAIMatching && resumeText.trim().length >= 80 && resumeText.length <= 12000) {
+      if (useAIMatching && hasValidResume && resumeText.length <= 12000) {
         const candidates = [...keywordMatches]
           .sort((first, second) => second.matchedTerms.length - first.matchedTerms.length || (Date.parse(second.date) || 0) - (Date.parse(first.date) || 0))
           .slice(0, 30);
@@ -1098,7 +1053,7 @@ function JobSearch({ analysis, resumeText = "" }) {
             <input value={keywords} onChange={(event) => { setKeywords(event.target.value); setKeywordsEdited(true); }} placeholder={analysis?.foundSkills.length ? analysis.foundSkills.slice(0, 6).join(", ") : "e.g. project management, nursing, Python"} />
             <small>{analysis ? `${analysis.foundSkills.length} catalog terms detected in extracted text. Edit this list before searching.` : "Upload a resume to prefill detected terms, or type terms separated by commas."}</small>
           </label>
-          {resumeText.trim().length >= 80 && resumeText.length <= 12000 && <label className="ri-ai-consent"><input type="checkbox" checked={useAIMatching} onChange={(event) => setUseAIMatching(event.target.checked)} /><span><strong>Use AI to rank relevant jobs</strong><small>When enabled, your resume and up to 30 public listing summaries are sent to the AI provider for this search. You can leave this off for keyword matching.</small></span></label>}
+          {hasValidResume && resumeText.length <= 12000 && <label className="ri-ai-consent"><input type="checkbox" checked={useAIMatching} onChange={(event) => setUseAIMatching(event.target.checked)} /><span><strong>Use AI to rank relevant jobs</strong><small>When enabled, your resume and up to 30 public listing summaries are sent to the AI provider for this search. You can leave this off for keyword matching.</small></span></label>}
           {resumeText.length > 12000 && <p className="ri-job-warning" role="status">This resume exceeds the 12,000-character AI limit. Shorten it before using AI; keyword job search is still available.</p>}
           <div className="ri-job-location-row">
             <label>Location
@@ -1154,11 +1109,13 @@ function ResumeIntelligence({ user }) {
   const storageKey = (key) => `${key}:${encodeURIComponent(user.id)}`;
   const profileStorageKey = storageKey(PROFILE_KEY);
   const resumeStorageKey = storageKey(RESUME_KEY);
+  const savedBuilderResumesStorageKey = storageKey("skillai-saved-builder-resumes");
+  const resumeExtractionStorageKey = storageKey("skillai-resume-extraction");
   const resumeCloudConsentKey = storageKey(RESUME_CLOUD_CONSENT_KEY);
   const tailorHeadingColorStorageKey = storageKey("skillai-resume-tailor-heading-color");
   const pageByRoute = {
-    dashboard: ["Resume Dashboard", "Review the content extracted from your resume and choose a useful next step.", BarChart3],
-    analyzer: ["Resume Analyzer", "Review text extracted from your resume and verify every finding.", FileText],
+    dashboard: ["Resume Hub", "Upload, review, and analyze your resume in one place.", FileText],
+    analyzer: ["Resume Hub", "Upload, review, and analyze your resume in one place.", FileText],
     builder: ["Resume Builder", "Create a clear, single-column resume from details you provide.", ListChecks],
     "match-tailor": ["Optimize", "Match a job description against your resume, then create a role-focused draft.", Target],
     optimizer: ["Optimize", "Match a job description against your resume, then create a role-focused draft.", Target],
@@ -1170,6 +1127,7 @@ function ResumeIntelligence({ user }) {
     profile: ["Career Profile", "Your reusable professional profile, grounded in your resume.", UserRound],
   };
   const [resumeText, setResumeText] = useState(() => window.localStorage.getItem(resumeStorageKey) || "");
+  const [resumeExtraction, setResumeExtraction] = useState(() => readStored(resumeExtractionStorageKey, {}));
   const [uploadStatus, setUploadStatus] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [needsResumeCloudConsent, setNeedsResumeCloudConsent] = useState(false);
@@ -1212,7 +1170,9 @@ function ResumeIntelligence({ user }) {
           return;
         } else if (saved.resumeText) {
           setResumeText(saved.resumeText);
+          setResumeExtraction({});
           window.localStorage.setItem(resumeStorageKey, saved.resumeText);
+          window.localStorage.removeItem(resumeExtractionStorageKey);
           window.localStorage.setItem(resumeCloudConsentKey, "accepted");
           setNotice("Loaded your resume saved to your account.");
         } else {
@@ -1230,9 +1190,10 @@ function ResumeIntelligence({ user }) {
     };
     void syncAccountResume();
     return () => { active = false; };
-  }, [user.authProvider, resumeStorageKey, resumeCloudConsentKey]);
+  }, [user.authProvider, resumeStorageKey, resumeExtractionStorageKey, resumeCloudConsentKey]);
 
-  const analysis = useMemo(() => scanResume(resumeText), [resumeText]);
+  const analysis = useMemo(() => scanResume(resumeText, resumeExtraction), [resumeText, resumeExtraction]);
+  const hasValidResume = Boolean(analysis);
   const role = ROLES.find((item) => item.name === targetRole) || null;
   const jobMatchReport = useMemo(
     () => buildJobMatchReport(resumeText, jobDescription, role),
@@ -1256,13 +1217,15 @@ function ResumeIntelligence({ user }) {
   const sectionCount = Object.keys(SECTION_HEADINGS).length;
   const sectionCoverage = analysis ? analysis.presentSections.length / sectionCount : 0;
   const targetRoleMatch = roleMatches.find((item) => item.name === targetRole);
-  const handleResumeRead = (text, status, busy, error) => {
+  const handleResumeRead = (text, status, busy, error, extraction = {}) => {
     setUploadStatus(status);
     setIsReading(busy);
     setUploadError(error);
     if (text) {
       setResumeText(text);
+      setResumeExtraction(extraction);
       window.localStorage.setItem(resumeStorageKey, text);
+      writeStored(resumeExtractionStorageKey, extraction);
       const nextProfile = { ...profile, resumeText: text, source: "uploaded resume" };
       setProfile(nextProfile);
       writeStored(profileStorageKey, nextProfile);
@@ -1289,14 +1252,40 @@ function ResumeIntelligence({ user }) {
     writeStored(profileStorageKey, next);
   };
 
-  const clearResume = () => {
+  const restoreBuilderResume = (savedResume) => {
+    const nextProfile = { ...savedResume.profile, resumeText: savedResume.resumeText };
+    window.localStorage.setItem(resumeStorageKey, savedResume.resumeText);
+    writeStored(resumeExtractionStorageKey, {});
+    writeStored(profileStorageKey, nextProfile);
+    setProfile(nextProfile);
+    setResumeText(savedResume.resumeText);
+    setResumeExtraction({});
+    setAiResults({});
+    setAiError("");
+    setNotice("Named resume loaded in this browser.");
+    if (user.authProvider === "firebase" && window.localStorage.getItem(resumeCloudConsentKey) === "accepted") {
+      void requestCloudResume("PUT", savedResume.resumeText).then(() => {
+        setNotice("Named resume loaded and synced to your account.");
+      }).catch((error) => {
+        setUploadError(`Named resume loaded in this browser but account sync failed: ${error.message}`);
+      });
+    }
+  };
+
+  const clearResume = ({ clearBuilderDetails = false } = {}) => {
     window.localStorage.removeItem(resumeStorageKey);
-    const nextProfile = { ...profile };
-    delete nextProfile.resumeText;
-    delete nextProfile.source;
+    window.localStorage.removeItem(resumeExtractionStorageKey);
+    const nextProfile = clearBuilderDetails
+      ? Object.fromEntries(["template", "templateColor", "photoDataUrl"].filter((key) => profile[key]).map((key) => [key, profile[key]]))
+      : { ...profile };
+    if (!clearBuilderDetails) {
+      delete nextProfile.resumeText;
+      delete nextProfile.source;
+    }
     setProfile(nextProfile);
     writeStored(profileStorageKey, nextProfile);
     setResumeText("");
+    setResumeExtraction({});
     setNeedsResumeCloudConsent(false);
     setUploadStatus("");
     setUploadError("");
@@ -1305,12 +1294,12 @@ function ResumeIntelligence({ user }) {
     if (user.authProvider === "firebase") {
       void requestCloudResume("DELETE").then(() => {
         setUploadError("");
-        setNotice("Resume text removed from your account.");
+        setNotice(clearBuilderDetails ? "All resume details and saved resume text were removed from your account." : "Resume text removed from your account.");
       }).catch((error) => {
-        setUploadError(`Resume was removed from this browser but could not be removed from your account: ${error.message}`);
+        setUploadError(`${clearBuilderDetails ? "All resume details and text were removed from this browser" : "Resume was removed from this browser"} but could not be removed from your account: ${error.message}`);
       });
     } else {
-      setNotice("Resume text removed from this browser.");
+      setNotice(clearBuilderDetails ? "All resume details and saved resume text were removed from this browser." : "Resume text removed from this browser.");
     }
   };
 
@@ -1333,8 +1322,8 @@ function ResumeIntelligence({ user }) {
   };
 
   const runAI = async (action, details = {}) => {
-    if (resumeText.trim().length < 80) {
-      setAiError("Add a resume with at least 80 readable characters before using resume AI.");
+    if (!hasValidResume) {
+      setAiError("Upload a valid resume with readable work, education, project, or skills sections before using resume AI.");
       return;
     }
     if (resumeText.length > 12000) {
@@ -1377,7 +1366,8 @@ function ResumeIntelligence({ user }) {
     setAiLoading("tailor-download");
     try {
       const roleName = targetRole || "Tailored";
-      await downloadDocx(`${roleName} Resume`, draft, "classic", SECTIONS, tailorHeadingColor);
+      const sections = parseResumeBuilderText(draft).sections.map(({ label }) => label);
+      await downloadDocx(`${roleName} Resume`, draft, profile.template || "classic", sections, profile.templateColor || tailorHeadingColor, profile.photoDataUrl || "", profile.sectionSpacing || {});
     } catch (error) {
       setAiError(error.message || "The tailored resume could not be downloaded. Please try again.");
     } finally {
@@ -1389,31 +1379,18 @@ function ResumeIntelligence({ user }) {
     const draft = aiResults.tailor?.draft;
     if (!draft) return;
     setAiError("");
-    const title = `${targetRole || "Tailored"} Resume`;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      setAiError("Your browser blocked the PDF window. Allow pop-ups for this site, then try Download PDF again.");
-      return;
-    }
-
-    try {
-      printWindow.opener = null;
-      printWindow.document.open();
-      printWindow.document.write(buildPrintableResume(title, draft, tailorHeadingColor));
-      printWindow.document.close();
-    } catch (error) {
-      printWindow.close();
-      setAiError(error.message || "The PDF preview could not be prepared. Please try again.");
-    }
+    const sections = parseResumeBuilderText(draft).sections.map(({ label }) => label);
+    void exportResume("pdf", draft, profile.template || "classic", sections, profile.templateColor || tailorHeadingColor, profile.photoDataUrl || "", profile.sectionSpacing || {})
+      .catch((error) => setAiError(error.message || "The tailored PDF could not be prepared. Please try again."));
   };
 
-  const exportResume = async (format, text = resumeText, template = "classic", sectionNames = SECTIONS, accentColor = "#A8401A", photoDataUrl = "") => {
+  const exportResume = async (format, text = resumeText, template = "classic", sectionNames = SECTIONS, accentColor = "#A8401A", photoDataUrl = "", sectionSpacing = {}) => {
     if (!text.trim()) {
       setNotice("Add or upload resume content before exporting.");
       return;
     }
     if (format === "docx") {
-      await downloadDocx("SkillAI Resume", text, template, sectionNames, accentColor, photoDataUrl);
+      await downloadDocx("SkillAI Resume", text, template, sectionNames, accentColor, photoDataUrl, sectionSpacing);
       return;
     }
     const cleanupPrintMode = () => document.body.classList.remove("ri-print-resume");
@@ -1430,23 +1407,24 @@ function ResumeIntelligence({ user }) {
   };
 
   const [title, description, Icon] = pageByRoute[route] || pageByRoute.dashboard;
+  const isResumeOverviewRoute = ["dashboard", "analyzer"].includes(route);
   const isMatchTailorRoute = ["match-tailor", "optimizer", "tailor"].includes(route);
   const isCareerAnalysisRoute = ["career-analysis", "skill-gaps", "project-analyzer"].includes(route);
 
   return (
-    <main className="page-shell ri-page">
+    <main className={`page-shell ri-page${isResumeOverviewRoute ? " ri-combined-overview" : ""}`}>
       <div className="wrap ri-layout">
         <aside className="ri-sidebar">
           <div className="ri-sidebar-brand"><span><FileText size={19} /></span><div><strong>Resume Intelligence</strong><small>Career workspace</small></div></div>
           {Object.entries({
-            RESUME: [["dashboard", "Resume Dashboard"], ["analyzer", "Resume Analyzer"], ["builder", "Resume Builder"]],
+            RESUME: [["dashboard", "Resume Hub"], ["builder", "Resume Builder"]],
             OPTIMIZATION: [["match-tailor", "Optimize"], ["job-match", "Job Match"]],
             "CAREER INTELLIGENCE": [["career-analysis", "Career Analysis"], ["profile", "Career Profile"]],
           }).map(([group, links]) => (
             <div className="ri-sidebar-group" key={group}>
               <span>{group}</span>
               {links.map(([slug, label]) => (
-                <Link key={slug} to={`/resume/${slug}`} className={`ri-sidebar-link${route === slug || (slug === "match-tailor" && ["optimizer", "tailor"].includes(route)) || (slug === "career-analysis" && ["skill-gaps", "project-analyzer"].includes(route)) ? " active" : ""}`}>{label}<ChevronRight size={14} /></Link>
+                <Link key={slug} to={`/resume/${slug}`} className={`ri-sidebar-link${(slug === "dashboard" && isResumeOverviewRoute) || route === slug || (slug === "match-tailor" && ["optimizer", "tailor"].includes(route)) || (slug === "career-analysis" && ["skill-gaps", "project-analyzer"].includes(route)) ? " active" : ""}`}>{label}<ChevronRight size={14} /></Link>
               ))}
             </div>
           ))}
@@ -1454,23 +1432,23 @@ function ResumeIntelligence({ user }) {
         </aside>
 
         <section className="ri-content">
-          <header className={`ri-page-heading${route === "dashboard" ? " ri-dashboard-page-heading" : ""}`}>
-            {route === "dashboard" ? (
+          <header className={`ri-page-heading${isResumeOverviewRoute ? " ri-dashboard-page-heading" : ""}`}>
+            {isResumeOverviewRoute ? (
               <div className="ri-dashboard-welcome">
                 <div className="ri-dashboard-title-copy">
                   <span className="eyebrow">CAREER WORKSPACE</span>
-                  <h1>Resume overview</h1>
-                  <p>Your resume and next steps, all in one place.</p>
+                  <h1>Resume Hub</h1>
+                  <p>Upload your resume, review its text, check your ATS score, and explore the analysis in one place.</p>
                 </div>
                 <span className={`ri-dashboard-file-state${resumeText ? " ready" : ""}`}><i />{resumeText ? "Resume added" : "No resume yet"}</span>
               </div>
             ) : (
               <div><span className="eyebrow">CAREER WORKSPACE / RESUME</span><h1><Icon size={25} />{title}</h1><p>{description}</p></div>
             )}
-            {route !== "builder" && route !== "dashboard" && <Link to="/resume/builder" className="secondary-button">{resumeText ? "Edit resume" : "Build a resume"} <ArrowRight size={16} /></Link>}
+            {route !== "builder" && !isResumeOverviewRoute && <Link to="/resume/builder" className="secondary-button">{resumeText ? "Edit resume" : "Build a resume"} <ArrowRight size={16} /></Link>}
           </header>
 
-          {route === "dashboard" && (
+          {isResumeOverviewRoute && (
             <section className="ri-dashboard-metrics" aria-label="Resume summary">
               <article><span className="ri-dashboard-metric-icon"><FileText size={17} /></span><div><small>Words</small><strong>{analysis ? analysis.wordCount.toLocaleString() : "—"}</strong><span>In your resume</span></div></article>
               <article><span className="ri-dashboard-metric-icon skills"><Target size={17} /></span><div><small>Recognized skills</small><strong>{analysis ? analysis.foundSkills.length : "—"}</strong><span>Catalog terms found</span></div></article>
@@ -1493,7 +1471,7 @@ function ResumeIntelligence({ user }) {
               </article>
               <aside className="ri-dashboard-quick-card">
                 <div><span className="ri-card-icon"><Sparkles size={18} /></span><div><h2>Go to</h2></div></div>
-                <Link to="/resume/analyzer"><span><FileText size={16} />Review resume</span><ChevronRight size={16} /></Link>
+                <Link to="/resume/dashboard"><span><FileText size={16} />Review resume</span><ChevronRight size={16} /></Link>
                 <Link to="/resume/match-tailor"><span><Target size={16} />Optimize</span><ChevronRight size={16} /></Link>
               </aside>
             </section>
@@ -1511,8 +1489,8 @@ function ResumeIntelligence({ user }) {
           {notice && <div className="ri-notice" role="status"><Check size={16} />{notice}</div>}
           {aiError && route !== "job-match" && <p className="ri-job-error" role="alert">{aiError}</p>}
 
-          {route === "analyzer" ? (
-            <section id={route === "dashboard" ? "resume-upload" : undefined} className={`ri-upload-panel${resumeText ? " has-resume" : " is-empty"}`}>
+          {isResumeOverviewRoute ? (
+            <section id="resume-upload" className={`ri-upload-panel${resumeText ? " has-resume" : " is-empty"}`}>
               <div className="ri-upload-copy">
                 <span className="ri-upload-kicker">{resumeText ? "RESUME READY" : "START WITH YOUR RESUME"}</span>
                 <strong>{resumeText ? "Your resume is ready to review" : "Bring your experience into focus"}</strong>
@@ -1522,7 +1500,7 @@ function ResumeIntelligence({ user }) {
               </div>
               <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} />
             </section>
-          ) : route !== "dashboard" && route !== "builder" ? (
+          ) : !isResumeOverviewRoute && route !== "builder" ? (
             <section className={`ri-resume-status${resumeText ? " has-resume" : " is-empty"}`}>
               <span className={`ri-status-icon${resumeText ? " ready" : ""}`} aria-hidden="true">
                 {resumeText ? <FileCheck2 size={20} strokeWidth={1.8} /> : <FileUp size={20} strokeWidth={1.8} />}
@@ -1532,7 +1510,7 @@ function ResumeIntelligence({ user }) {
                 <small>{resumeText ? "Saved in this browser and ready for your career tools." : "Upload a resume to unlock analysis and matching tools."}</small>
               </span>
               {route === "job-match" && <ResumeUpload onRead={handleResumeRead} status={uploadStatus} busy={isReading} error={uploadError} compact hasResume={Boolean(resumeText)} />}
-              {route !== "builder" && route !== "job-match" && <Link to="/resume/analyzer">{resumeText ? "Review resume" : "Add resume"} <ArrowRight size={16} /></Link>}
+              {route !== "builder" && route !== "job-match" && <Link to="/resume/dashboard">{resumeText ? "Review resume" : "Add resume"} <ArrowRight size={16} /></Link>}
             </section>
           ) : null}
 
@@ -1542,7 +1520,7 @@ function ResumeIntelligence({ user }) {
                 <div className="ri-analytics-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>Resume insights</h2></div><p>Counts from your resume text</p></div>
                 <section className="ri-dashboard-charts">
                   <article className="ri-dashboard-widget ri-dashboard-coverage">
-                    <div className="ri-dashboard-widget-heading"><div><h2>Sections</h2><p>Standard headings found in your text</p></div><Link to="/resume/analyzer" aria-label="Review resume headings"><ArrowRight size={16} /></Link></div>
+                    <div className="ri-dashboard-widget-heading"><div><h2>Sections</h2><p>Standard headings found in your text</p></div><Link to="/resume/dashboard" aria-label="Review resume headings"><ArrowRight size={16} /></Link></div>
                     {analysis ? (
                       <div className="ri-coverage-content">
                         <svg className="ri-coverage-chart" viewBox="0 0 120 120" role="img" aria-label={`${analysis.presentSections.length} of ${sectionCount} standard headings detected`}>
@@ -1577,7 +1555,7 @@ function ResumeIntelligence({ user }) {
                     ) : <div className="ri-chart-empty"><Target size={18} /><span>{analysis ? "No catalog skill terms detected yet." : "Add a resume to see detected skill terms."}</span></div>}
                   </article>
                   <article className="ri-dashboard-widget ri-dashboard-writing-chart">
-                    <div className="ri-dashboard-widget-heading"><div><h2>Writing snapshot</h2><p>Bullet and number patterns</p></div><Link to="/resume/analyzer" aria-label="Review detected writing patterns"><ArrowRight size={16} /></Link></div>
+                    <div className="ri-dashboard-widget-heading"><div><h2>Writing snapshot</h2><p>Bullet and number patterns</p></div><Link to="/resume/dashboard" aria-label="Review detected writing patterns"><ArrowRight size={16} /></Link></div>
                     {analysis ? (
                       <div className="ri-writing-chart-content">
                         <div className="ri-writing-chart-main">
@@ -1628,8 +1606,14 @@ function ResumeIntelligence({ user }) {
             </section>
           )}
 
-          {route === "analyzer" && (
+          {isResumeOverviewRoute && (
             <>
+              {analysis?.confidence.level === "low" && (
+                <div className="ri-job-error ri-analyzer-extraction-warning" role="status">
+                  <strong>Check extraction quality</strong>
+                  <span>{analysis.confidence.warning}</span>
+                </div>
+              )}
               <section className="ri-analyzer-stats" aria-label="Resume text statistics">
                 <div className="ri-analyzer-stats-heading"><div><span className="eyebrow">RESUME ANALYSIS</span><h2>Resume stats</h2></div><span>ATS score estimate · text-based heuristic</span></div>
                 <div className="ri-analyzer-stat-grid">
@@ -1640,9 +1624,10 @@ function ResumeIntelligence({ user }) {
                 </div>
                 {analysis ? (
                   <>
+                    {analysis.confidence.level === "high" ? (
                     <article className={`ri-analyzer-score-card${analysis.atsReadiness.score >= 80 ? " strong" : analysis.atsReadiness.score >= 60 ? " good" : analysis.atsReadiness.score >= 40 ? " developing" : " needs-work"}`}>
                       <div className="ri-analyzer-score-overview">
-                        <div className="ri-analyzer-score-heading"><span className="eyebrow">TEXT-BASED ESTIMATE</span><h3>ATS score</h3><p>Resume structure, contact details, skills and writing patterns.</p></div>
+                        <div className="ri-analyzer-score-heading"><span className="eyebrow">TEXT-BASED ESTIMATE</span><h3>ATS score</h3><p>Resume text only: structure, contact details, skills and writing patterns. Template layout and employer ATS parsing are not tested.</p></div>
                         <div className="ri-analyzer-score-gauge" role="img" aria-label={`Estimated ATS score ${analysis.atsReadiness.score} out of 100; ${analysis.atsReadiness.label}`}>
                           <svg viewBox="0 0 120 120" aria-hidden="true">
                             <circle cx="60" cy="60" r="47" className="ri-analyzer-score-track" />
@@ -1663,7 +1648,19 @@ function ResumeIntelligence({ user }) {
                       </div>
                       <p className="ri-analyzer-score-disclaimer">This is a SkillAI heuristic from extracted text, not a score from an employer’s ATS. It does not test file layout, compare a job description, or predict screening or hiring results. Check the original resume and tailor it to the specific role.</p>
                     </article>
+                    ) : (
+                      <article className="ri-analyzer-score-card ri-analyzer-score-unavailable">
+                        <div><span className="eyebrow">SCORE UNAVAILABLE</span><h3>Extraction needs review</h3><p>{analysis.confidence.warning}</p></div>
+                      </article>
+                    )}
                     <div className="ri-analyzer-chart-grid">
+                    <article className="ri-analyzer-chart-card ri-analyzer-contact-card">
+                      <div className="ri-analyzer-chart-heading"><div><h3>Detected contact details</h3><p>Found in the extracted resume text</p></div></div>
+                      <dl>
+                        <div><dt>Email</dt><dd>{analysis.contact.email.values.length ? analysis.contact.email.values.join(", ") : "Not detected"}</dd></div>
+                        <div><dt>Phone</dt><dd>{analysis.contact.phone.values.length ? analysis.contact.phone.values.join(", ") : "Not detected"}</dd></div>
+                      </dl>
+                    </article>
                     <article className="ri-analyzer-chart-card">
                       <div className="ri-analyzer-chart-heading"><div><h3>Section coverage</h3><p>Standard headings detected in extracted text</p></div><span>{analysis.presentSections.length}/{sectionCount}</span></div>
                       <div className="ri-analyzer-coverage-content">
@@ -1681,20 +1678,7 @@ function ResumeIntelligence({ user }) {
                           })}
                         </div>
                       </div>
-                      <p className="ri-analyzer-chart-note">A heading not detected here may still exist in a format the text extractor could not read.</p>
-                    </article>
-                    <article className="ri-analyzer-chart-card">
-                      <div className="ri-analyzer-chart-heading"><div><h3>Skills by field</h3><p>Recognized catalog terms grouped by sector</p></div><span>{analysis.foundSkills.length} found</span></div>
-                      {skillSectors.length ? (
-                        <div className="ri-analyzer-sector-chart" role="img" aria-label={`Recognized terms by field: ${skillSectors.map(({ name, count }) => `${name}, ${count}`).join("; ")}`}>
-                          {skillSectors.slice(0, 5).map(({ name, count }) => (
-                            <div className="ri-analyzer-sector-row" key={name}>
-                              <span title={name}>{name}</span><span className="ri-analyzer-sector-track"><i style={{ width: `${Math.max(8, count / Math.max(...skillSectors.map((item) => item.count)) * 100)}%` }} /></span><strong>{count}</strong>
-                            </div>
-                          ))}
-                        </div>
-                      ) : <div className="ri-analyzer-chart-empty"><Target size={19} /><span>No built-in catalog terms detected in the text.</span></div>}
-                      <div className="ri-analyzer-skill-tags" aria-label="Recognized skills">{analysis.foundSkills.slice(0, 10).map((skill) => <span key={skill}>{skill}</span>)}{analysis.foundSkills.length > 10 && <span>+{analysis.foundSkills.length - 10} more</span>}</div>
+                      <p className="ri-analyzer-chart-note">Not detected: {analysis.missingSections.map((section) => section.charAt(0).toUpperCase() + section.slice(1)).join(", ") || "none"}. A heading can be missed if the source uses an unusual label or extraction could not read it.</p>
                     </article>
                     <article className="ri-analyzer-chart-card ri-analyzer-writing-card">
                       <div className="ri-analyzer-chart-heading"><div><h3>Writing patterns</h3><p>Bullet starts and number patterns in your text</p></div><span>Text check only</span></div>
@@ -1708,18 +1692,26 @@ function ResumeIntelligence({ user }) {
                         </div>
                         <div className="ri-analyzer-quantified"><small>Number-pattern phrases</small><strong>{analysis.quantifiedClaims.length}</strong><span>Review each claim against your source.</span></div>
                       </div>
-                      <p className="ri-analyzer-chart-note">A bullet outside the limited verb list is not necessarily weak. No claims are independently verified.</p>
+                      {analysis.actionBullets.length > 0 && <details className="ri-analyzer-evidence">
+                        <summary>Review detected action-verb evidence ({analysis.actionBullets.length})</summary>
+                        <ul>{analysis.actionBullets.map(({ verb, snippet }, index) => <li key={`${verb}-${index}`}><strong>{verb}</strong> — {snippet}</li>)}</ul>
+                      </details>}
+                      {analysis.quantifiedClaims.length > 0 && <details className="ri-analyzer-evidence">
+                        <summary>Review measurable-result evidence ({analysis.quantifiedClaims.length})</summary>
+                        <ul>{analysis.quantifiedClaims.map(({ value, snippet }, index) => <li key={`${value}-${index}`}><strong>{value}</strong> — {snippet}</li>)}</ul>
+                      </details>}
+                      <p className="ri-analyzer-chart-note">Unlisted bullet openings are not automatically weak. Numbers and claims are detected from text only and are not independently verified.</p>
                     </article>
                     </div>
                   </>
                 ) : (
-                  <div className="ri-analyzer-stats-empty"><FileText size={20} /><strong>Your stats will appear here</strong><span>Upload a resume above to see section, skill and writing-pattern charts.</span></div>
+                  <div className="ri-analyzer-stats-empty"><FileText size={20} /><strong>{resumeText ? "This file does not look like a resume" : "Your stats will appear here"}</strong><span>{resumeText ? validateResumeText(resumeText).error : "Upload a resume above to see section, skill and writing-pattern charts."}</span></div>
                 )}
               </section>
               <article className="ri-card ri-analyzer-source"><h2>Review the source, not just the parser</h2><p>Check extracted text against the original resume. If a heading or line is missing here, verify the source PDF before changing your resume.</p>{analysis && <details className="ri-extracted-text"><summary>Review extracted resume text</summary><pre>{resumeText}</pre></details>}</article>
-              {analysis?.quantifiedClaims.length > 0 && <article className="ri-card"><h2>Evidence review</h2><p>Check the source for every measurable claim. SkillAI has not independently verified these statements.</p>{analysis.quantifiedClaims.map((claim) => <div className="ri-evidence-row" key={claim}><span className="ri-priority medium">User-provided</span><span>{claim}</span><strong>Needs evidence</strong></div>)}</article>}
+              {analysis?.quantifiedClaims.length > 0 && <article className="ri-card"><h2>Evidence review</h2><p>Check the source for every measurable claim. SkillAI has not independently verified these statements.</p>{analysis.quantifiedClaims.map((claim, index) => <div className="ri-evidence-row" key={`${claim.value}-${index}`}><span className="ri-priority medium">User-provided</span><span>{claim.snippet}</span><strong>Needs evidence</strong></div>)}</article>}
               <section className="ri-card ri-ai-resume-card">
-                <div className="ri-section-heading"><div><span className="eyebrow">AI WRITING COACH</span><h2>Get an evidence-based resume review</h2><p>AI reviews clarity and relevance using only the text you provide. It cannot verify claims or predict hiring results.</p></div><button type="button" className="primary-button" onClick={() => void runAI("analyze")} disabled={Boolean(aiLoading) || resumeText.trim().length < 80}>{aiLoading === "analyze" ? "Reviewing…" : "Review with AI"} <Sparkles size={16} /></button></div>
+                <div className="ri-section-heading"><div><span className="eyebrow">AI WRITING COACH</span><h2>Get an evidence-based resume review</h2><p>AI reviews clarity and relevance using only the text you provide. It cannot verify claims or predict hiring results.</p></div><button type="button" className="primary-button" onClick={() => void runAI("analyze")} disabled={Boolean(aiLoading) || !hasValidResume}>{aiLoading === "analyze" ? "Reviewing…" : "Review with AI"} <Sparkles size={16} /></button></div>
                 <p className="ri-ai-privacy-note"><ShieldCheck size={14} /> Your resume text is sent to the AI provider only after you select “Review with AI”.</p>
                 {aiResults.analyze && <div className="ri-ai-review-result">
                   <p className="ri-ai-summary">{aiResults.analyze.summary}</p>
@@ -1733,7 +1725,14 @@ function ResumeIntelligence({ user }) {
             </>
           )}
 
-          {route === "builder" && <ResumeBuilder profile={profile} onUpdate={updateProfile} onExport={exportResume} onBuilt={(text) => handleResumeRead(text, user.authProvider === "firebase" ? "Builder draft saved to your account." : "Builder draft saved locally.", false, "")} />}
+          {route === "builder" && <ResumeBuilder profile={profile} savedResumesKey={savedBuilderResumesStorageKey} onRestore={restoreBuilderResume} onUpdate={updateProfile} onClear={() => clearResume({ clearBuilderDetails: true })} onImport={(importedProfile) => {
+            const nextProfile = { ...profile, ...importedProfile };
+            [...SECTIONS.map((section) => section.toLowerCase()), ...Object.keys(profile).filter((key) => key.startsWith("custom:"))]
+              .forEach((key) => delete nextProfile[key]);
+            Object.assign(nextProfile, importedProfile);
+            setProfile(nextProfile);
+            writeStored(profileStorageKey, nextProfile);
+          }} onExport={exportResume} onBuilt={(text) => handleResumeRead(text, user.authProvider === "firebase" ? "Builder draft saved to your account." : "Builder draft saved locally.", false, "")} />}
 
           {isMatchTailorRoute && (
             <section className="ri-card ri-match-tailor-workspace">
@@ -1758,7 +1757,7 @@ function ResumeIntelligence({ user }) {
                   <p>Review skills found in your resume text and terms not detected. This comparison does not assess your suitability.</p>
                   <JobMatchReport
                     report={jobMatchReport}
-                    hasResume={resumeText.trim().length >= 80}
+                    hasResume={hasValidResume}
                     hasRole={Boolean(role)}
                     hasJobDescription={jobDescription.trim().length >= 40}
                     roleName={role?.name || ""}
@@ -1774,21 +1773,42 @@ function ResumeIntelligence({ user }) {
                     <input
                       type="color"
                       aria-label="Resume heading color"
-                      value={normalizeHexColor(tailorHeadingColor)}
+                      value={normalizeHexColor(profile.templateColor || tailorHeadingColor)}
                       onChange={(event) => {
                         const color = normalizeHexColor(event.target.value);
+                        updateProfile("templateColor", color);
                         setTailorHeadingColor(color);
                         writeStored(tailorHeadingColorStorageKey, color);
                       }}
                     />
                   </label>
-                  <div className="ri-ai-action-row"><button type="button" className="primary-button" onClick={() => void runAI("tailor", { targetRole, jobDescription })} disabled={Boolean(aiLoading) || resumeText.trim().length < 80 || jobDescription.trim().length < 40}>{aiLoading === "tailor" ? "Tailoring your resume…" : "Tailor my resume for this job"} <Sparkles size={16} /></button><span className="ri-ai-privacy-note"><ShieldCheck size={14} /> Resume and job description are sent to AI only when you choose this action.</span></div>
+                  <label className="ri-tailor-template-select">Resume template
+                    <select
+                      value={RESUME_TEMPLATES.some((item) => item.id === profile.template) ? profile.template : "classic"}
+                      onChange={(event) => updateProfile("template", event.target.value)}
+                    >
+                      {RESUME_TEMPLATES.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </label>
+                  <div className="ri-ai-action-row"><button type="button" className="primary-button" onClick={() => void runAI("tailor", { targetRole, jobDescription })} disabled={Boolean(aiLoading) || !hasValidResume || jobDescription.trim().length < 40}>{aiLoading === "tailor" ? "Tailoring your resume…" : "Tailor my resume for this job"} <Sparkles size={16} /></button><span className="ri-ai-privacy-note"><ShieldCheck size={14} /> Resume and job description are sent to AI only when you choose this action.</span></div>
                   {aiResults.tailor && <div className="ri-ai-tailor-result">
-                    <div className="ri-section-heading"><div><span className="eyebrow">YOUR JOB-TAILORED RESUME</span><h3>Review your professional draft</h3><p>Check every detail against your original before downloading or applying.</p></div><div className="ri-tailor-result-actions"><button type="button" className="primary-button" onClick={() => void downloadTailoredDraft()} disabled={Boolean(aiLoading)}><Download size={16} />{aiLoading === "tailor-download" ? "Preparing Word file…" : "Download Word resume"}</button><button type="button" className="secondary-button" onClick={downloadTailoredPdf}><Download size={16} /> Download PDF</button><button type="button" className="secondary-button" onClick={applyTailoredDraft}>Save as my current resume</button></div></div>
-                    {aiResults.tailor.addedSkills.length > 0 && <p className="ri-ai-summary">{aiResults.tailor.addedSkills.length} JD skill{aiResults.tailor.addedSkills.length === 1 ? "" : "s"} missing from the source resume {aiResults.tailor.addedSkills.length === 1 ? "was" : "were"} placed in the resume’s Skills section. Please verify them before applying.</p>}
-                    <pre aria-label="Job-tailored resume preview">{aiResults.tailor.draft}</pre>
-                    <div className="ri-columns"><article><h3>Changes made</h3><ul>{aiResults.tailor.changes.map((item, index) => <li key={`change-${index}`}>{item}</li>)}</ul></article><article><h3>Evidence to review</h3>{aiResults.tailor.reviewNotes.length ? <ul>{aiResults.tailor.reviewNotes.map((item, index) => <li key={`review-${index}`}>{item}</li>)}</ul> : <p>No specific missing-evidence notes returned. Still verify every detail against your original.</p>}</article></div>
-                    <p className="ri-disclaimer">AI can still introduce errors. Replacing the current resume overwrites its text on this device; verify all claims before downloading or applying.</p>
+                    <div className="ri-ai-tailor-layout">
+                      <div className="ri-ai-tailor-details">
+                        <div className="ri-section-heading"><div><span className="eyebrow">YOUR JOB-TAILORED RESUME</span><h3>Review your professional draft</h3><p>Check every detail against your original before downloading or applying.</p></div><div className="ri-tailor-result-actions"><button type="button" className="primary-button" onClick={() => void downloadTailoredDraft()} disabled={Boolean(aiLoading)}><Download size={16} />{aiLoading === "tailor-download" ? "Preparing Word file…" : "Download Word resume"}</button><button type="button" className="secondary-button" onClick={downloadTailoredPdf}><Download size={16} /> Download PDF</button><button type="button" className="secondary-button" onClick={applyTailoredDraft}>Save as my current resume</button></div></div>
+                        {aiResults.tailor.addedSkills.length > 0 && <p className="ri-ai-summary">{aiResults.tailor.addedSkills.length} JD skill{aiResults.tailor.addedSkills.length === 1 ? "" : "s"} missing from the source resume {aiResults.tailor.addedSkills.length === 1 ? "was" : "were"} placed in the resume’s Skills section. Please verify them before applying.</p>}
+                        <details className="ri-tailored-source-text"><summary>Review tailored text</summary><pre aria-label="Job-tailored resume text">{aiResults.tailor.draft}</pre></details>
+                        <div className="ri-columns"><article><h3>Changes made</h3><ul>{aiResults.tailor.changes.map((item, index) => <li key={`change-${index}`}>{item}</li>)}</ul></article><article><h3>Evidence to review</h3>{aiResults.tailor.reviewNotes.length ? <ul>{aiResults.tailor.reviewNotes.map((item, index) => <li key={`review-${index}`}>{item}</li>)}</ul> : <p>No specific missing-evidence notes returned. Still verify every detail against your original.</p>}</article></div>
+                        <p className="ri-disclaimer">AI can still introduce errors. Replacing the current resume overwrites its text on this device; verify all claims before downloading or applying.</p>
+                      </div>
+                      <TailoredResumePreview
+                        draft={aiResults.tailor.draft}
+                        template={RESUME_TEMPLATES.some((item) => item.id === profile.template) ? profile.template : "classic"}
+                        accentColor={profile.templateColor || tailorHeadingColor}
+                        photoDataUrl={profile.photoDataUrl || ""}
+                        sectionSpacing={profile.sectionSpacing || {}}
+                        onSectionSpacingChange={(sectionName, direction) => updateProfile("sectionSpacing", adjustResumeSectionSpacing(profile.sectionSpacing || {}, sectionName, direction))}
+                      />
+                    </div>
                   </div>}
                   <p className="ri-disclaimer">AI may miss or misinterpret information. No experience, skills, metrics, or project results should be used unless you can verify them.</p>
                 </div>
@@ -1835,7 +1855,7 @@ function ResumeIntelligence({ user }) {
                     type="button"
                     className="primary-button ri-ai-skill-button"
                     onClick={() => void runAI("skill-gaps", { targetRole: role.name, requiredSkills: role.skills })}
-                    disabled={Boolean(aiLoading) || resumeText.trim().length < 80}
+                    disabled={Boolean(aiLoading) || !hasValidResume}
                   >
                     {aiLoading === "skill-gaps" ? "Reviewing evidence…" : "Review skills with AI"} <Sparkles size={16} />
                   </button>
@@ -2007,6 +2027,9 @@ function JobMatchReport({ report, hasResume, hasRole, hasJobDescription, roleNam
 }
 
 const RESUME_TEMPLATES = [
+  { id: "academic-cv", name: "Academic CV", description: "A traditional, single-column CV for education, research, publications, and detailed experience.", headshot: false, graphics: "None", columns: 1 },
+  { id: "modern-clean", name: "Modern Clean", description: "A clear, contemporary one-column resume with a restrained accent and compact section rhythm.", headshot: false, graphics: "Simple", columns: 1 },
+  { id: "classic-serif", name: "Classic Serif", description: "A formal, typography-led single-column resume with fine dividers and a centered header.", headshot: false, graphics: "None", columns: 1 },
   { id: "classic", name: "Professional", description: "The clean single-column style from your CV.", headshot: false, graphics: "None", columns: 1 },
   { id: "modern", name: "Modern", description: "Contemporary spacing with accent section titles.", headshot: true, graphics: "Simple", columns: 1 },
   { id: "compact", name: "Compact", description: "Tighter layout to fit more content on each page.", headshot: false, graphics: "None", columns: 1 },
@@ -2041,57 +2064,235 @@ const TEMPLATE_COLORS = [
   { name: "Red", hex: "#CA3D4B" },
 ];
 
-function TemplatePaper({ template, color, hasHeadshot, photoDataUrl }) {
+function TemplatePaper({ template, color, hasHeadshot, photoDataUrl, profile, previewSections }) {
+  const previewRef = useRef(null);
+  const [scale, setScale] = useState(0);
+  const isColumns = ["sidebar", "split", "portfolio"].includes(template);
+  const railSectionNames = template === "portfolio"
+    ? new Set(["certifications"])
+    : new Set(["skills", "education", "certifications", "languages", "training"]);
+  const sampleSections = [
+    { id: "summary", label: "Professional Summary", content: "Operations professional experienced in service coordination, reporting, and improving team processes." },
+    { id: "skills", label: "Core Skills", content: "Operations coordination · Customer service · Data reporting · Microsoft Excel · Project support" },
+    { id: "experience", label: "Professional Experience", content: "Operations Associate · Northstar Services\nCoordinate service requests and prepare weekly team reports." },
+    { id: "projects", label: "Selected Projects", content: "Service Insights Dashboard\nBuilt a dashboard to track request volume and monthly trends." },
+    { id: "education", label: "Education", content: "Bachelor of Business Administration\nUniversity of Delhi · 2021" },
+  ];
+  const hasProfileDetails = Boolean(
+    profile.name
+    || profile.headline
+    || profile.phone
+    || profile.email
+    || profile.linkedin
+    || profile.github
+    || previewSections.length,
+  );
+  const sectionsToPreview = previewSections.length ? previewSections : hasProfileDetails ? [] : sampleSections;
+  const railSections = sectionsToPreview.filter((section) => template === "portfolio"
+    ? section.id === "certifications"
+    : railSectionNames.has(section.id));
+  const mainSections = sectionsToPreview.filter((section) => !railSections.includes(section));
+  const contacts = [
+    { key: "phone", label: "Phone", value: profile.phone, Icon: Phone },
+    { key: "email", label: "Email", value: profile.email, Icon: Mail },
+    { key: "linkedin", label: "LinkedIn", value: profile.linkedin, Icon: Linkedin },
+    { key: "github", label: "GitHub", value: profile.github, Icon: Github },
+  ].filter((item) => item.value);
+  const renderSections = (items) => items.map((section) => (
+    <section
+      key={section.id}
+      className={section.id === "skills" ? "ri-resume-section-skills" : undefined}
+      style={{ "--ri-section-space": `${getResumeSectionSpacing(profile.sectionSpacing, section.id)}px` }}
+    >
+      <ResumeSectionHeading
+        label={section.label}
+        spacing={getResumeSectionSpacing(profile.sectionSpacing, section.id)}
+      />
+      <ResumeContent content={section.content} sectionKey={section.id} />
+    </section>
+  ));
+
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return undefined;
+    const updateScale = () => {
+      const width = element.getBoundingClientRect().width;
+      if (width > 0) setScale(width / 793.7);
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <span className={`ri-template-paper ri-template-paper-${template}`} style={{ "--template-accent": color }} aria-hidden="true">
-      <span className="ri-template-paper-header">
-        {hasHeadshot && <span className="ri-template-avatar">{photoDataUrl ? <img src={photoDataUrl} alt="" /> : "Photo"}</span>}
-        <span className="ri-template-paper-name">DIYA AGARWAL</span>
-        <span className="ri-template-paper-contact">+91 98765 43210 · diya@example.com · linkedin.com/in/diyaagarwal · github.com/diyaagarwal</span>
-      </span>
-      <span className="ri-template-paper-body">
-        {["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-rail"><b>{template === "portfolio" ? "PORTFOLIO" : "SKILLS"}</b><i>Communication</i><i>Data analysis</i><i>Project planning</i><b>{template === "portfolio" ? "TOOLS" : "EDUCATION"}</b><i>Bachelor's degree</i></span>}
-        <span className="ri-template-paper-main">
-          <span className="ri-template-paper-section">
-            <b>PROFESSIONAL SUMMARY</b>
-            <i>Customer-focused operations professional with 4+ years of experience coordinating daily business activities, supporting cross-functional teams and improving service delivery. Recognized for clear communication, accurate reporting and a practical approach to solving customer and process challenges.</i>
-          </span>
-          {!["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-section">
-            <b>CORE SKILLS</b>
-            <i>Operations coordination · Customer service · Process improvement · Data reporting · Microsoft Excel · Project support · Documentation · Team collaboration · Scheduling · Problem solving</i>
-          </span>}
-          <span className="ri-template-paper-section">
-            <b>PROFESSIONAL EXPERIENCE</b>
-            <strong>Operations Associate · Northstar Services <small>2023 – Present</small></strong>
-            <i>• Coordinate daily service requests and track work across a team of 12 associates.</i>
-            <i>• Prepare weekly Excel reports, verify records and share progress with team leads.</i>
-            <i>• Updated the handover checklist to make shift transitions more consistent.</i>
-            <strong>Customer Support Coordinator · Cedar & Co. <small>2021 – 2023</small></strong>
-            <i>• Responded to customer enquiries and documented requests through resolution.</i>
-            <i>• Worked with billing and fulfilment teams to resolve order issues on time.</i>
-          </span>
-          <span className="ri-template-paper-section">
-            <b>SELECTED PROJECTS</b>
-            <strong>Service Insights Dashboard</strong>
-            <i>Built an Excel dashboard to track request volume, response time and monthly trends.</i>
-            <strong>Team Handover Toolkit</strong>
-            <i>Created shared checklists and reference notes for recurring support workflows.</i>
-          </span>
-          <span className="ri-template-paper-section">
-            <b>EDUCATION</b>
-            <strong>Bachelor of Business Administration</strong>
-            <i>University of Delhi · 2021</i>
-            <strong>Higher Secondary Certificate</strong>
-            <i>Central Public School · 2018</i>
-          </span>
-          {!["sidebar", "split", "portfolio"].includes(template) && <span className="ri-template-paper-section">
-            <b>CERTIFICATIONS & LANGUAGES</b>
-            <i>Excel for Business · Customer Experience Foundations</i>
-            <i>English (Professional) · Hindi (Native)</i>
-          </span>}
-        </span>
-      </span>
+    <span className={`ri-template-paper ri-template-paper-${template}`} ref={previewRef} aria-hidden="true">
+      <article
+        className={`ri-template-paper-page ri-resume-document ri-resume-document-${template} ri-template-${template}`}
+        style={{ "--template-accent": color, transform: `scale(${scale})` }}
+      >
+        <header className="ri-resume-document-header">
+          {hasHeadshot && <span className="ri-resume-avatar">{photoDataUrl ? <img src={photoDataUrl} alt="" /> : "AI"}</span>}
+          <div>
+            <h2>{profile.name || (hasProfileDetails ? "Your Name" : "Diya Agarwal")}</h2>
+            {(profile.headline || !hasProfileDetails) && <p className="ri-resume-headline">{profile.headline || "Operations & Project Coordinator"}</p>}
+            <div className="ri-resume-contacts">
+              {contacts.length
+                ? contacts.map(({ key, label, value, Icon }) => <span key={key}><Icon size={13} aria-hidden="true" /><b>{label}:</b> {value}</span>)
+                : <span className="ri-resume-contact-empty">{hasProfileDetails ? "Add contact details in the form." : "+91 98765 43210 · diya@example.com · linkedin.com/in/diyaagarwal"}</span>}
+            </div>
+          </div>
+        </header>
+        {isColumns && railSections.length > 0 ? (
+          <div className="ri-resume-document-columns">
+            <div className="ri-resume-document-rail">{renderSections(railSections)}</div>
+            <div className="ri-resume-document-main">{renderSections(mainSections)}</div>
+          </div>
+        ) : (
+          <div className="ri-resume-document-main">{renderSections(sectionsToPreview)}</div>
+        )}
+      </article>
     </span>
+  );
+}
+
+function TailoredResumePreview({ draft, template, accentColor, photoDataUrl, sectionSpacing, onSectionSpacingChange }) {
+  const { profile, sections } = parseResumeBuilderText(draft);
+  const templateInfo = RESUME_TEMPLATES.find((item) => item.id === template) || RESUME_TEMPLATES[0];
+  const contacts = [
+    { key: "phone", value: profile.phone },
+    { key: "email", value: profile.email },
+    { key: "linkedin", value: profile.linkedin },
+    { key: "github", value: profile.github },
+  ].filter(({ value }) => value);
+  const sideSectionNames = new Set(["skills", "education", "certifications", "languages", "training"]);
+  const isColumns = ["sidebar", "split", "portfolio"].includes(template);
+  const railSections = sections.filter((section) => template === "portfolio"
+    ? section.key === "certifications"
+    : sideSectionNames.has(section.key));
+  const mainSections = sections.filter((section) => !railSections.includes(section));
+
+  const renderSections = (items) => items.map((section) => {
+    return (
+      <section
+        className={section.key === "skills" ? "ri-resume-section-skills" : undefined}
+        key={section.key}
+        style={{ "--ri-section-space": `${getResumeSectionSpacing(sectionSpacing, section.key)}px` }}
+      >
+        <ResumeSectionHeading
+          label={section.label}
+          spacing={getResumeSectionSpacing(sectionSpacing, section.key)}
+          onSpacingChange={(direction) => onSectionSpacingChange(section.key, direction)}
+        />
+        <ResumeContent content={section.content} sectionKey={section.key} />
+      </section>
+    );
+  });
+
+  return (
+    <div className={`ri-live-preview ri-tailor-resume-preview ri-template-${template}`} style={{ "--template-accent": normalizeHexColor(accentColor) }}>
+      <span className="eyebrow">A4 PREVIEW · {templateInfo.name.toUpperCase()}</span>
+      <article className={`ri-resume-document ri-resume-document-${template}`}>
+        <header className="ri-resume-document-header">
+          {templateInfo.headshot && photoDataUrl && <img className="ri-resume-avatar" src={photoDataUrl} alt="Resume profile" />}
+          <div>
+            <h2>{profile.name || "Your Name"}</h2>
+            {profile.headline && <p>{profile.headline}</p>}
+            {contacts.length > 0 && <p className="ri-resume-contacts">{contacts.map(({ key, value }, index) => {
+              const href = getResumeContactHref(key, value);
+              return <Fragment key={key}>{href
+                ? <a href={href} target={["linkedin", "github"].includes(key) ? "_blank" : undefined} rel={["linkedin", "github"].includes(key) ? "noreferrer" : undefined}>{value}</a>
+                : <span>{value}</span>}{index < contacts.length - 1 && <span aria-hidden="true"> · </span>}</Fragment>;
+            })}</p>}
+          </div>
+        </header>
+        {isColumns && railSections.length > 0 ? (
+          <div className="ri-resume-document-columns">
+            <div className="ri-resume-document-rail">{renderSections(railSections)}</div>
+            <div className="ri-resume-document-main">{renderSections(mainSections)}</div>
+          </div>
+        ) : (
+          <div className="ri-resume-document-main">{renderSections(sections)}</div>
+        )}
+      </article>
+    </div>
+  );
+}
+
+function ExpandableTextarea({ id, label, value, onChange, placeholder, rows }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const triggerRef = useRef(null);
+  const expandedTextareaRef = useRef(null);
+
+  useEffect(() => {
+    if (!isExpanded) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    expandedTextareaRef.current?.focus();
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsExpanded(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+      triggerRef.current?.focus();
+    };
+  }, [isExpanded]);
+
+  return (
+    <>
+      <div className="ri-expandable-textarea" hidden={isExpanded}>
+        <textarea
+          id={id}
+          rows={rows}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          aria-label={label}
+        />
+        <button
+          ref={triggerRef}
+          type="button"
+          className="ri-expand-textarea-button"
+          aria-label={`Maximize ${label}`}
+          title={`Maximize ${label}`}
+          onClick={() => setIsExpanded(true)}
+        >
+          <Maximize2 size={15} aria-hidden="true" />
+        </button>
+      </div>
+      {isExpanded && (
+        <div className="ri-textarea-modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setIsExpanded(false);
+        }}>
+          <section className="ri-textarea-modal" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}>
+            <header>
+              <h2 id={`${id}-title`}>{label}</h2>
+              <button
+                type="button"
+                className="ri-expand-textarea-button"
+                aria-label={`Minimize ${label}`}
+                title={`Minimize ${label}`}
+                onClick={() => setIsExpanded(false)}
+              >
+                <Minimize2 size={17} aria-hidden="true" />
+              </button>
+            </header>
+                <textarea
+                  ref={expandedTextareaRef}
+                  id={`${id}-expanded`}
+                  rows={rows}
+                  value={value}
+                  onChange={onChange}
+                  placeholder={placeholder}
+                  aria-label={label}
+                />
+            <small>Your changes are saved as you type.</small>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2118,7 +2319,17 @@ function ExperienceEntryEditor({ entries, onChange }) {
             <label>Company<input value={entry.company || ""} onChange={(event) => updateEntry(entry.id, "company", event.target.value)} placeholder="Company name" /></label>
             <label>Start year<input inputMode="numeric" value={entry.startDate || ""} onChange={(event) => updateEntry(entry.id, "startDate", event.target.value)} placeholder="e.g. 2022" /></label>
             <label>End year<input value={entry.endDate || ""} onChange={(event) => updateEntry(entry.id, "endDate", event.target.value)} placeholder="e.g. 2025 or Present" /></label>
-            <label className="ri-grid-full">Responsibilities and outcomes<textarea rows={4} value={entry.description || ""} onChange={(event) => updateEntry(entry.id, "description", event.target.value)} placeholder="Add verified responsibilities or achievements; use one line per item." /></label>
+            <div className="ri-grid-full ri-experience-description">
+              <label htmlFor={`experience-description-${entry.id}`}>Responsibilities and outcomes</label>
+              <ExpandableTextarea
+                id={`experience-description-${entry.id}`}
+                label="Responsibilities and outcomes"
+                rows={4}
+                value={entry.description || ""}
+                onChange={(event) => updateEntry(entry.id, "description", event.target.value)}
+                placeholder="Add verified responsibilities or achievements; use one line per item."
+              />
+            </div>
           </div>
         </fieldset>
       ))}
@@ -2127,12 +2338,25 @@ function ExperienceEntryEditor({ entries, onChange }) {
   );
 }
 
-function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
+function ResumeBuilder({ profile, savedResumesKey, onRestore, onUpdate, onClear, onImport, onExport, onBuilt }) {
   const [customSection, setCustomSection] = useState("");
   const [sections, setSections] = useState(SECTIONS);
+  const [sectionToAdd, setSectionToAdd] = useState("");
+  const [sectionLabelOverrides, setSectionLabelOverrides] = useState({});
+  const [savedResumes, setSavedResumes] = useState([]);
+  const [savedResumeName, setSavedResumeName] = useState("");
+  const [savedResumeError, setSavedResumeError] = useState("");
+  const [savedResumeStatus, setSavedResumeStatus] = useState("");
+  const [previewResume, setPreviewResume] = useState(null);
+  const [printPreviewOnOpen, setPrintPreviewOnOpen] = useState(false);
+  const [editingSectionIndex, setEditingSectionIndex] = useState(null);
+  const [editingSectionLabel, setEditingSectionLabel] = useState("");
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [showAssist, setShowAssist] = useState(false);
   const [bullet, setBullet] = useState("");
+  const [pastedResume, setPastedResume] = useState("");
+  const [importFeedback, setImportFeedback] = useState("");
+  const [importError, setImportError] = useState("");
   const [templateChosen, setTemplateChosen] = useState(false);
   const template = RESUME_TEMPLATES.some((item) => item.id === profile.template) ? profile.template : "classic";
   const templateColor = TEMPLATE_COLORS.some((item) => item.hex === profile.templateColor) ? profile.templateColor : TEMPLATE_COLORS[0].hex;
@@ -2141,6 +2365,53 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
   const [columnsFilter, setColumnsFilter] = useState("all");
   const [photoError, setPhotoError] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(savedResumesKey);
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(parsed) || parsed.some((item) => (
+        !item || typeof item.id !== "string" || typeof item.name !== "string"
+        || typeof item.resumeText !== "string" || typeof item.createdAt !== "number"
+        || !Array.isArray(item.sections) || item.sections.some((section) => typeof section !== "string")
+        || !item.profile || typeof item.profile !== "object" || Array.isArray(item.profile)
+        || !item.sectionLabelOverrides || typeof item.sectionLabelOverrides !== "object"
+        || Array.isArray(item.sectionLabelOverrides)
+      ))) {
+        throw new Error("Saved resume data has an invalid format.");
+      }
+      setSavedResumes(parsed);
+      setSavedResumeError("");
+    } catch (error) {
+      setSavedResumeError(`Saved resumes could not be read: ${error.message}`);
+    }
+  }, [savedResumesKey]);
+  useEffect(() => {
+    if (!previewResume) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setPreviewResume(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [previewResume]);
+  useEffect(() => {
+    if (!previewResume || !printPreviewOnOpen) return undefined;
+    const timer = window.setTimeout(() => {
+      const cleanup = () => document.body.classList.remove("ri-print-saved-resume");
+      window.addEventListener("afterprint", cleanup, { once: true });
+      document.body.classList.add("ri-print-saved-resume");
+      try {
+        window.print();
+        window.setTimeout(cleanup, 2000);
+      } catch (error) {
+        window.removeEventListener("afterprint", cleanup);
+        cleanup();
+        setSavedResumeError(`PDF export could not be opened: ${error.message}`);
+      } finally {
+        setPrintPreviewOnOpen(false);
+      }
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [previewResume, printPreviewOnOpen]);
   const selectedTemplate = RESUME_TEMPLATES.find((item) => item.id === template) || RESUME_TEMPLATES[0];
   const visibleTemplates = RESUME_TEMPLATES.filter((item) =>
     (headshotFilter === "all" || item.headshot === (headshotFilter === "yes"))
@@ -2148,14 +2419,25 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
     && (columnsFilter === "all" || item.columns === Number(columnsFilter)));
   const sectionKey = (section) => section.startsWith("custom:") ? section : section.toLowerCase();
   const sectionLabel = (section) => section.startsWith("custom:") ? section.slice(7) : section;
+  const availableSections = SECTIONS.filter((section) => !sections.includes(section));
+  const resolveSectionLabel = (section) => {
+    const key = section.startsWith("custom:") ? `custom:${section.slice(7)}` : section.toLowerCase();
+    return sectionLabelOverrides[key] || sectionLabel(section);
+  };
+  const sectionSpacing = profile.sectionSpacing || {};
+  const updateSectionSpacing = (sectionName, direction) => {
+    onUpdate("sectionSpacing", adjustResumeSectionSpacing(sectionSpacing, sectionName, direction));
+  };
   const secondarySectionNames = new Set(["skills", "education", "certifications", "languages", "training"]);
   const experienceEntries = Array.isArray(profile.experienceEntries) ? profile.experienceEntries : [];
   const experienceText = experienceEntries
     .filter((entry) => [entry.role, entry.company, entry.startDate, entry.endDate, entry.description].some(Boolean))
     .map((entry) => {
-      const heading = [entry.role, entry.company].filter(Boolean).join(" | ");
+      const employer = entry.company ? `**${entry.company}**` : "";
+      const role = entry.role ? `**${entry.role}**` : "";
       const dates = [entry.startDate, entry.endDate].filter(Boolean).join(" – ");
-      return `${heading}${dates ? `\t${dates}` : ""}${entry.description ? `\n${entry.description}` : ""}`;
+      const roleLine = [role, dates].filter(Boolean).join("\t");
+      return [employer, roleLine, entry.description].filter(Boolean).join("\n");
     }).join("\n\n");
   const sectionContent = (section) => {
     const key = sectionKey(section);
@@ -2163,8 +2445,37 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
   };
   const populatedSections = sections
     .filter((section) => sectionContent(section))
-    .map((section) => ({ id: section, label: sectionLabel(section), content: sectionContent(section) }));
+    .map((section) => ({ id: section, label: resolveSectionLabel(section), content: sectionContent(section) }));
+  const builderRailSections = populatedSections.filter((section) => template === "portfolio"
+    ? section.label.toLowerCase() === "certifications"
+    : secondarySectionNames.has(section.label.toLowerCase()));
+  const builderMainSections = populatedSections.filter((section) => !builderRailSections.includes(section));
   const initials = (profile.name || "Your Name").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  const beginSectionLabelEdit = (index) => {
+    setEditingSectionIndex(index);
+    setEditingSectionLabel(resolveSectionLabel(sections[index]));
+  };
+  const commitSectionLabelEdit = (index) => {
+    const value = editingSectionLabel.trim();
+    if (!value) {
+      setEditingSectionIndex(null);
+      setEditingSectionLabel("");
+      return;
+    }
+    const section = sections[index];
+    const displayValue = value.replace(/\s+/g, " ").trim();
+    const normalizedKey = section.startsWith("custom:") ? `custom:${displayValue}` : section.toLowerCase();
+    if (section.startsWith("custom:")) {
+      setSections((current) => current.map((item, currentIndex) => currentIndex === index ? `custom:${displayValue}` : item));
+    } else {
+      setSectionLabelOverrides((current) => ({ ...current, [section.toLowerCase()]: displayValue }));
+    }
+    setEditingSectionIndex(null);
+    setEditingSectionLabel("");
+    if (section.startsWith("custom:")) {
+      setCustomSection("");
+    }
+  };
   const handlePhotoChange = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -2187,19 +2498,28 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
   ].filter((item) => item.value);
   const renderResumeSections = (items) => items.map((section) => {
     const isExperience = section.id.toLowerCase() === "experience";
+    const spacing = getResumeSectionSpacing(sectionSpacing, section.id.replace(/^custom:/, ""));
     return (
-      <section key={section.id}>
-        <h3>{section.label}</h3>
+      <section
+        className={section.id.toLowerCase() === "skills" ? "ri-resume-section-skills" : undefined}
+        key={section.id}
+        style={{ "--ri-section-space": `${spacing}px` }}
+      >
+        <ResumeSectionHeading
+          label={section.label}
+          onDoubleClick={() => beginSectionLabelEdit(sections.indexOf(section.id))}
+        />
         {isExperience && experienceEntries.filter((entry) => [entry.role, entry.company, entry.startDate, entry.endDate, entry.description].some(Boolean)).map((entry) => (
           <div className="ri-resume-experience-entry" key={entry.id}>
-            <div className="ri-resume-experience-heading">
-              <strong>{[entry.role, entry.company].filter(Boolean).join(" | ")}</strong>
+            {entry.company && <strong className="ri-resume-experience-company">{entry.company}</strong>}
+            {(entry.role || entry.startDate || entry.endDate) && <div className="ri-resume-experience-heading">
+              {entry.role && <strong>{entry.role}</strong>}
               {(entry.startDate || entry.endDate) && <span>{[entry.startDate, entry.endDate].filter(Boolean).join(" – ")}</span>}
-            </div>
+            </div>}
             {entry.description && <p>{entry.description}</p>}
           </div>
         ))}
-        {isExperience ? profile.experience && <p>{profile.experience}</p> : <p>{section.content}</p>}
+        {isExperience ? profile.experience && <ResumeContent content={profile.experience} sectionKey={section.id} /> : <ResumeContent content={section.content} sectionKey={section.id} />}
       </section>
     );
   });
@@ -2207,8 +2527,71 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
     profile.name || "Your Name",
     contactItems.map(({ label, value }) => `${label}: ${value}`).join("  |  "),
     profile.headline || "",
-    ...sections.filter((section) => sectionContent(section)).map((section) => `${sectionLabel(section)}\n${sectionContent(section)}`),
+    ...sections.filter((section) => sectionContent(section)).map((section) => `${resolveSectionLabel(section)}\n${sectionContent(section)}`),
   ].filter(Boolean).join("\n\n");
+  const saveNamedResume = () => {
+    const name = savedResumeName.trim();
+    if (!name) {
+      setSavedResumeError("Enter a name for this resume.");
+      setSavedResumeStatus("");
+      return;
+    }
+    if (fullText.trim() === "Your Name") {
+      setSavedResumeError("Add at least one resume detail before saving.");
+      setSavedResumeStatus("");
+      return;
+    }
+    const savedResume = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name,
+      createdAt: Date.now(),
+      profile: { ...profile, resumeText: fullText },
+      resumeText: fullText,
+      sections: [...sections],
+      sectionLabelOverrides: { ...sectionLabelOverrides },
+    };
+    const nextResumes = [savedResume, ...savedResumes];
+    try {
+      window.localStorage.setItem(savedResumesKey, JSON.stringify(nextResumes));
+      setSavedResumes(nextResumes);
+      setSavedResumeName("");
+      setSavedResumeError("");
+      setSavedResumeStatus(`“${name}” saved on this device.`);
+    } catch (error) {
+      setSavedResumeError(`This resume could not be saved: ${error.message}`);
+      setSavedResumeStatus("");
+    }
+  };
+  const loadNamedResume = (savedResume) => {
+    try {
+      onRestore(savedResume);
+      setSections(savedResume.sections);
+      setSectionLabelOverrides(savedResume.sectionLabelOverrides);
+      setSavedResumeError("");
+      setSavedResumeStatus(`Loaded “${savedResume.name}”.`);
+    } catch (error) {
+      setSavedResumeError(`This resume could not be loaded: ${error.message}`);
+      setSavedResumeStatus("");
+    }
+  };
+  const deleteNamedResume = (id) => {
+    const nextResumes = savedResumes.filter((savedResume) => savedResume.id !== id);
+    try {
+      window.localStorage.setItem(savedResumesKey, JSON.stringify(nextResumes));
+      setSavedResumes(nextResumes);
+      setSavedResumeError("");
+      setSavedResumeStatus("Saved resume deleted.");
+    } catch (error) {
+      setSavedResumeError(`This resume could not be deleted: ${error.message}`);
+      setSavedResumeStatus("");
+    }
+  };
+  const downloadNamedResume = (savedResume) => {
+    setSavedResumeError("");
+    setSavedResumeStatus(`Choose “Save as PDF” in the print dialog for “${savedResume.name}”.`);
+    setPreviewResume(savedResume);
+    setPrintPreviewOnOpen(true);
+  };
   const moveSection = (index, direction) => {
     const next = [...sections];
     const target = index + direction;
@@ -2221,20 +2604,52 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
     setDraggedIndex(null);
   };
   const addCustom = () => {
-    const label = customSection.trim();
-    if (label && !sections.some((section) => sectionLabel(section).toLowerCase() === label.toLowerCase())) setSections((current) => [...current, `custom:${label}`]);
+    if (sectionToAdd === "__custom__") {
+      const label = customSection.trim();
+      if (label && !sections.some((section) => sectionLabel(section).toLowerCase() === label.toLowerCase())) {
+        setSections((current) => [...current, `custom:${label}`]);
+      }
+    } else if (availableSections.includes(sectionToAdd)) {
+      setSections((current) => [...current, sectionToAdd]);
+    }
     setCustomSection("");
+    setSectionToAdd("");
   };
   const rewriteBullet = () => {
     const sentence = bullet.trim().replace(/[.!?]*$/, "");
     return sentence ? `${sentence}${/[.!?]$/.test(bullet.trim()) ? "" : "."}` : "";
+  };
+  const importPastedResume = () => {
+    const result = parseResumeBuilderText(pastedResume);
+    if (result.error) {
+      setImportError(result.error);
+      setImportFeedback("");
+      return;
+    }
+    if (!result.profile.name && !result.sections.length) {
+      setImportError("We couldn't find a name or recognizable resume sections. Check the pasted text and try again.");
+      setImportFeedback("");
+      return;
+    }
+    onImport(result.profile);
+    setSections(result.sections.map(({ key }) => key));
+    setImportError("");
+    setImportFeedback(`Filled ${result.sections.length} resume section${result.sections.length === 1 ? "" : "s"} from your pasted text. Review everything before exporting.`);
+  };
+  const clearAllDetails = () => {
+    if (!window.confirm("Clear all resume details and saved resume text? Your selected template and photo will be kept.")) return;
+    onClear();
+    setSections(SECTIONS);
+    setPastedResume("");
+    setImportError("");
+    setImportFeedback("All resume details were cleared. Your selected template and photo were kept.");
   };
   return (
     <div className={`ri-builder-layout${templateChosen ? " ri-builder-editing" : " ri-builder-template-select"}`}>
       {!templateChosen && <fieldset className="ri-template-picker">
         <legend>Choose a resume template</legend>
         <h2>Templates we recommend for you</h2>
-        <p className="ri-template-picker-hint">You can always change your template later.</p>
+        <p className="ri-template-picker-hint">For simpler ATS text extraction, start with a single-column template without a photo or decorative graphics. The analyzer scores resume text, not page layout.</p>
         <div className="ri-template-filters" aria-label="Filter resume templates">
           <strong>Filter by</strong>
           <label><span>Headshot</span><select aria-label="Filter by headshot" value={headshotFilter} onChange={(event) => setHeadshotFilter(event.target.value)}><option value="all">Any headshot</option><option value="yes">With headshot</option><option value="no">Without headshot</option></select></label>
@@ -2251,9 +2666,12 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
         <div className="ri-template-options">
           {visibleTemplates.map((item) => (
             <button key={item.id} type="button" className={`ri-template-option${templateChosen && template === item.id ? " selected" : ""}`} style={{ "--template-accent": templateColor }} aria-pressed={templateChosen && template === item.id} onClick={() => { onUpdate("template", item.id); setTemplateChosen(true); }}>
-              <TemplatePaper template={item.id} color={templateColor} hasHeadshot={item.headshot} photoDataUrl={item.headshot ? profile.photoDataUrl : ""} />
+              <TemplatePaper template={item.id} color={templateColor} hasHeadshot={item.headshot} photoDataUrl={item.headshot ? profile.photoDataUrl : ""} profile={profile} previewSections={populatedSections} />
               <span className="ri-template-option-copy">
                 <strong>{item.name}</strong>
+                <span className={`ri-template-ats-badge${isAtsFriendlyTemplate(item) ? " recommended" : ""}`}>
+                  {isAtsFriendlyTemplate(item) ? "ATS-friendly layout" : "Visual layout · review parsing"}
+                </span>
                 <small>{item.description}</small>
                 <span className="ri-template-option-action">{templateChosen && template === item.id ? <><Check size={15} /> Selected</> : "Choose template"}</span>
               </span>
@@ -2264,7 +2682,21 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
       </fieldset>}
       {templateChosen && <>
       <section className="ri-card ri-builder-form">
-        <div className="ri-builder-form-heading"><div><h2>Verified resume details</h2><p>Fill in real information. Every section is optional except your name; don't add claims you cannot support.</p></div><button type="button" className="secondary-button" onClick={() => setTemplateChosen(false)}>Change template</button></div>
+        <div className="ri-builder-form-heading"><div><h2>Verified resume details</h2><p>Fill in real information. Every section is optional except your name; don't add claims you cannot support.</p></div><div className="ri-builder-form-actions"><button type="button" className="secondary-button" onClick={clearAllDetails}>Clear all details</button><button type="button" className="secondary-button" onClick={() => setTemplateChosen(false)}>Change template</button></div></div>
+        <section className="ri-builder-import" aria-labelledby="ri-builder-import-heading">
+          <div>
+            <h3 id="ri-builder-import-heading">Fill from pasted resume text</h3>
+            <p>Paste a resume draft from any AI tool or document. We’ll organize its details into this template on your device—nothing is generated or sent to an AI service. Importing replaces the current contact and section text but keeps your selected template and photo.</p>
+          </div>
+          <label htmlFor="ri-builder-pasted-resume">Paste your resume</label>
+          <textarea id="ri-builder-pasted-resume" rows={8} value={pastedResume} onChange={(event) => { setPastedResume(event.target.value); setImportError(""); setImportFeedback(""); }} placeholder={"# Your Name\n**Your professional headline**\n\nEmail: you@example.com\n\n## PROFESSIONAL SUMMARY\nPaste your summary here…"} />
+          <div className="ri-builder-import-actions">
+            <button type="button" className="primary-button" onClick={importPastedResume} disabled={!pastedResume.trim()}>Import and fill template</button>
+            <span>Recognizes Markdown headings and common resume sections.</span>
+          </div>
+          {importError && <p className="ri-builder-import-error" role="alert">{importError}</p>}
+          {importFeedback && <p className="ri-builder-import-success" role="status">{importFeedback}</p>}
+        </section>
         <div className="ri-form-grid">
           <label>Full name<input value={profile.name || ""} onChange={(event) => onUpdate("name", event.target.value)} /></label>
           <label>Contact number<input type="tel" autoComplete="tel" value={profile.phone || ""} onChange={(event) => onUpdate("phone", event.target.value)} placeholder="+91 98765 43210" /></label>
@@ -2281,61 +2713,139 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
         </section>}
         <div className="ri-builder-sections">
           <h3>Reorder or remove sections</h3>
-          {sections.map((section, index) => (
-            <div
-              key={section}
-              className={`ri-builder-section${draggedIndex === index ? " dragging" : ""}`}
-              draggable
-              onDragStart={() => setDraggedIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
-                if (draggedIndex === null) return;
-                const next = [...sections];
-                const [item] = next.splice(draggedIndex, 1);
-                next.splice(index, 0, item);
-                setSections(next);
-                setDraggedIndex(null);
-              }}
-              onDragEnd={() => setDraggedIndex(null)}
-            >
-              <span className="ri-drag-handle" aria-hidden="true">⠿</span>
-              <div className="ri-builder-section-fields">
-                <label>{sectionLabel(section)}</label>
-                {sectionKey(section) === "experience" && <ExperienceEntryEditor entries={experienceEntries} onChange={(value) => onUpdate("experienceEntries", value)} />}
-                <textarea
-                  rows={3}
-                  value={profile[sectionKey(section)] || ""}
-                  onChange={(event) => onUpdate(sectionKey(section), event.target.value)}
-                  placeholder={sectionKey(section) === "experience" ? "Keep legacy or imported experience details here; these are preserved as entered." : `Add verified ${sectionLabel(section).toLowerCase()} details…`}
-                  aria-label={`${sectionLabel(section)} details`}
-                />
-              </div>
-              <div className="ri-section-actions">
-                <div className="ri-reorder-buttons">
-                  <button type="button" onClick={() => moveSection(index, -1)} aria-label={`Move ${sectionLabel(section)} up`} title="Move up">↑</button>
-                  <button type="button" onClick={() => moveSection(index, 1)} aria-label={`Move ${sectionLabel(section)} down`} title="Move down">↓</button>
+          {sections.map((section, index) => {
+            const spacing = getResumeSectionSpacing(sectionSpacing, section.replace(/^custom:/, ""));
+            const label = resolveSectionLabel(section);
+            const isEditingThisSection = editingSectionIndex === index;
+            return (
+              <div
+                key={section}
+                className={`ri-builder-section${draggedIndex === index ? " dragging" : ""}`}
+                draggable
+                onDragStart={() => setDraggedIndex(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => {
+                  if (draggedIndex === null) return;
+                  const next = [...sections];
+                  const [item] = next.splice(draggedIndex, 1);
+                  next.splice(index, 0, item);
+                  setSections(next);
+                  setDraggedIndex(null);
+                }}
+                onDragEnd={() => setDraggedIndex(null)}
+              >
+                <span className="ri-drag-handle" aria-hidden="true">⠿</span>
+                <div className="ri-builder-section-fields">
+                  {isEditingThisSection ? (
+                    <input
+                      autoFocus
+                      value={editingSectionLabel}
+                      onChange={(event) => setEditingSectionLabel(event.target.value)}
+                      onBlur={() => commitSectionLabelEdit(index)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commitSectionLabelEdit(index);
+                        if (event.key === "Escape") {
+                          setEditingSectionIndex(null);
+                          setEditingSectionLabel("");
+                        }
+                      }}
+                      aria-label={`Edit section title for ${label}`}
+                    />
+                  ) : (
+                    <label onDoubleClick={() => beginSectionLabelEdit(index)}>{label}</label>
+                  )}
+                  {sectionKey(section) === "experience" && <ExperienceEntryEditor entries={experienceEntries} onChange={(value) => onUpdate("experienceEntries", value)} />}
+                  <textarea
+                    rows={3}
+                    value={profile[sectionKey(section)] || ""}
+                    onChange={(event) => onUpdate(sectionKey(section), event.target.value)}
+                    placeholder={sectionKey(section) === "experience" ? "Keep legacy or imported experience details here; these are preserved as entered." : `Add verified ${label.toLowerCase()} details…`}
+                    aria-label={`${label} details`}
+                  />
                 </div>
-                <button
-                  type="button"
-                  className="ri-delete-section"
-                  onClick={() => removeSection(index)}
-                  aria-label={`Remove ${sectionLabel(section)} section from this resume`}
-                  title="Remove section from resume"
-                >
-                  <Trash2 size={15} aria-hidden="true" />
-                </button>
+                <div className="ri-section-actions">
+                  <div className="ri-reorder-buttons">
+                    <button type="button" onClick={() => moveSection(index, -1)} aria-label={`Move ${label} up`} title="Move up">↑</button>
+                    <button type="button" onClick={() => moveSection(index, 1)} aria-label={`Move ${label} down`} title="Move down">↓</button>
+                  </div>
+                  <div className="ri-section-spacing-buttons" aria-label={`${label} section spacing`}>
+                    <button type="button" onClick={() => updateSectionSpacing(section.replace(/^custom:/, ""), -1)} aria-label={`Reduce space above ${label}`} title="Reduce space above this section" disabled={spacing <= -12}><Minus size={12} aria-hidden="true" /></button>
+                    <button type="button" onClick={() => updateSectionSpacing(section.replace(/^custom:/, ""), 1)} aria-label={`Increase space above ${label}`} title="Increase space above this section" disabled={spacing >= 36}><Plus size={12} aria-hidden="true" /></button>
+                  </div>
+                  <button
+                    type="button"
+                    className="ri-delete-section"
+                    onClick={() => removeSection(index)}
+                    aria-label={`Remove ${label} section from this resume`}
+                    title="Remove section from resume"
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {!sections.length && <p className="ri-experience-empty">All sections are removed. Add a section name below to continue.</p>}
         </div>
-        <div className="ri-inline-form"><input value={customSection} onChange={(event) => setCustomSection(event.target.value)} placeholder="Custom section name" /><button type="button" className="secondary-button" onClick={addCustom}>Add section</button></div>
+        <div className="ri-inline-form ri-add-section-form">
+          <select aria-label="Choose section to add" value={sectionToAdd} onChange={(event) => setSectionToAdd(event.target.value)}>
+            <option value="">Choose a section</option>
+            {availableSections.map((section) => <option key={section} value={section}>{section}</option>)}
+            <option value="__custom__">Custom section…</option>
+          </select>
+          {sectionToAdd === "__custom__" && <input value={customSection} onChange={(event) => setCustomSection(event.target.value)} placeholder="Custom section name" aria-label="Custom section name" />}
+          <button type="button" className="secondary-button" onClick={addCustom} disabled={!sectionToAdd || (sectionToAdd === "__custom__" && !customSection.trim())}>Add section</button>
+        </div>
         <button type="button" className="secondary-button" onClick={() => setShowAssist((value) => !value)}><Lightbulb size={16} /> Writing assistant</button>
         {showAssist && <div className="ri-assist"><p>Paste a real bullet and we can format its punctuation. This local helper does not generate new achievements or facts.</p><textarea className="ri-textarea" rows={3} value={bullet} onChange={(event) => setBullet(event.target.value)} placeholder="Describe what you actually did…" />{bullet && <p><strong>Formatted draft:</strong> {rewriteBullet()}</p>}</div>}
-        <div className="ri-builder-actions"><button type="button" className="primary-button" onClick={() => onBuilt(fullText)}>Save resume text <Check size={15} /></button><button type="button" className="secondary-button" onClick={() => onExport("pdf", fullText, template, SECTIONS, templateColor, profile.photoDataUrl)}><Download size={15} /> Print / Save PDF</button><button type="button" className="secondary-button" onClick={() => onExport("docx", fullText, template, sections.map(sectionLabel), templateColor, profile.photoDataUrl)}><Download size={15} /> Export DOCX</button></div>
+        <section className="ri-saved-resumes" aria-labelledby="ri-saved-resumes-heading">
+          <div>
+            <h3 id="ri-saved-resumes-heading">Save another resume</h3>
+            <p>Name this version so you can return to it later. Saved versions stay in this browser.</p>
+          </div>
+          <div className="ri-inline-form">
+            <input aria-label="Resume name" value={savedResumeName} onChange={(event) => setSavedResumeName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveNamedResume(); }} placeholder="e.g. Product Designer Resume" maxLength={80} />
+            <button type="button" className="secondary-button" onClick={saveNamedResume}>Save named resume</button>
+          </div>
+          {savedResumeError && <p className="ri-saved-resume-error" role="alert">{savedResumeError}</p>}
+          {savedResumeStatus && <p className="ri-saved-resume-status" role="status">{savedResumeStatus}</p>}
+          {savedResumes.length > 0 && <ul className="ri-saved-resume-list">
+            {savedResumes.map((savedResume) => (
+              <li key={savedResume.id}>
+                <div><strong>{savedResume.name}</strong><small>{new Date(savedResume.createdAt).toLocaleString()}</small></div>
+                <div className="ri-saved-resume-actions">
+                  <button type="button" className="secondary-button ri-saved-resume-icon-button" onClick={() => setPreviewResume(savedResume)} aria-label={`Preview ${savedResume.name}`} title="Preview"><Eye size={16} /></button>
+                  <button type="button" className="secondary-button ri-saved-resume-icon-button" onClick={() => downloadNamedResume(savedResume)} aria-label={`Download PDF for ${savedResume.name}`} title="Download PDF"><Download size={16} /></button>
+                  <button type="button" className="secondary-button" onClick={() => loadNamedResume(savedResume)}>Load</button>
+                  <button type="button" className="secondary-button" onClick={() => deleteNamedResume(savedResume.id)} aria-label={`Delete ${savedResume.name}`}><Trash2 size={15} /> Delete</button>
+                </div>
+              </li>
+            ))}
+          </ul>}
+        </section>
+        {previewResume && <div className="ri-saved-resume-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewResume(null); }}>
+          <section className="ri-saved-resume-preview" role="dialog" aria-modal="true" aria-labelledby="ri-saved-resume-preview-title">
+            <header>
+              <div><span className="eyebrow">SAVED RESUME PREVIEW</span><h3 id="ri-saved-resume-preview-title">{previewResume.name}</h3></div>
+              <button type="button" className="secondary-button ri-saved-resume-icon-button" onClick={() => setPreviewResume(null)} aria-label="Close preview"><X size={18} /></button>
+            </header>
+            <pre>{previewResume.resumeText}</pre>
+            <footer>
+              <button type="button" className="secondary-button" onClick={() => { loadNamedResume(previewResume); setPreviewResume(null); }}>Load resume</button>
+              <button type="button" className="primary-button" onClick={() => downloadNamedResume(previewResume)}><Download size={16} /> Download PDF</button>
+            </footer>
+          </section>
+        </div>}
+        <div className="ri-builder-actions"><button type="button" className="primary-button" onClick={() => onBuilt(fullText)}>Save resume text <Check size={15} /></button>        <button type="button" className="secondary-button" onClick={() => onExport("pdf", fullText, template, sections.map(resolveSectionLabel), templateColor, profile.photoDataUrl, sectionSpacing)}><Download size={15} /> Print / Save PDF</button><button type="button" className="secondary-button" onClick={() => onExport("docx", fullText, template, sections.map(resolveSectionLabel), templateColor, profile.photoDataUrl, sectionSpacing)}><Download size={15} /> Export DOCX</button></div>
       </section>
       <aside className={`ri-card ri-live-preview ri-template-${template}`} style={{ "--template-accent": templateColor }}>
         <span className="eyebrow">LIVE PREVIEW · {RESUME_TEMPLATES.find((item) => item.id === template)?.name.toUpperCase()}</span>
+        <div className={`ri-template-ats-notice${isAtsFriendlyTemplate(selectedTemplate) ? " recommended" : ""}`} role="note">
+          <p>{isAtsFriendlyTemplate(selectedTemplate)
+            ? "This single-column template avoids a headshot and decorative graphics. That can make text easier for parsers to follow, but it is not a guarantee of ATS results."
+            : "This template uses a photo, multiple columns, or decorative styling. Some text parsers may read these layouts out of order."}</p>
+          {!isAtsFriendlyTemplate(selectedTemplate) && <button type="button" className="text-link" onClick={() => onUpdate("template", "classic")}>Switch to the Professional template</button>}
+        </div>
         <article className={`ri-resume-document ri-resume-document-${template}`}>
           <header className="ri-resume-document-header">
             {selectedTemplate.headshot && (profile.photoDataUrl
@@ -2345,15 +2855,21 @@ function ResumeBuilder({ profile, onUpdate, onExport, onBuilt }) {
               <h2>{profile.name || "Your Name"}</h2>
               {profile.headline && <p className="ri-resume-headline">{profile.headline}</p>}
               <div className="ri-resume-contacts" aria-label="Resume contact information">
-                {contactItems.map(({ key, label, value, Icon }) => <span key={key}><Icon size={13} aria-hidden="true" /><b>{label}:</b> {value}</span>)}
+                {contactItems.map(({ key, label, value, Icon }) => {
+                  const href = getResumeContactHref(key, value);
+                  const content = <><Icon size={13} aria-hidden="true" /><b>{label}:</b> {value}</>;
+                  return href
+                    ? <a key={key} href={href} target={["linkedin", "github"].includes(key) ? "_blank" : undefined} rel={["linkedin", "github"].includes(key) ? "noreferrer" : undefined}>{content}</a>
+                    : <span key={key}>{content}</span>;
+                })}
                 {!contactItems.length && <span className="ri-resume-contact-empty">Add your phone, email, LinkedIn and GitHub in the form.</span>}
               </div>
             </div>
           </header>
-          {["sidebar", "split", "portfolio"].includes(template) ? (
+          {["sidebar", "split", "portfolio"].includes(template) && builderRailSections.length > 0 ? (
             <div className="ri-resume-document-columns">
-              <div className="ri-resume-document-rail">{renderResumeSections(populatedSections.filter((section) => template === "portfolio" ? ["projects", "certifications"].includes(section.label.toLowerCase()) : secondarySectionNames.has(section.label.toLowerCase())))}</div>
-              <div className="ri-resume-document-main">{renderResumeSections(populatedSections.filter((section) => template === "portfolio" ? !["projects", "certifications"].includes(section.label.toLowerCase()) : !secondarySectionNames.has(section.label.toLowerCase())))}</div>
+              <div className="ri-resume-document-rail">{renderResumeSections(builderRailSections)}</div>
+              <div className="ri-resume-document-main">{renderResumeSections(builderMainSections)}</div>
             </div>
           ) : (
             <div className="ri-resume-document-main">{renderResumeSections(populatedSections)}</div>

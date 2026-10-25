@@ -2,12 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { validateGeneratedResult, validateResumeAssistantPayload } from "./resume-assistant-api.js";
 
-const resumeText = "A detailed candidate resume with over eighty characters describing Python projects, data analysis, and measurable work experience.";
+const resumeText = `A detailed candidate resume
+
+Experience
+Developed Python projects and completed data analysis for measurable work outcomes.
+
+Skills
+Python, data analysis, and project management`;
 
 test("resume AI validates supported actions and requires readable resume text", () => {
   assert.equal(validateResumeAssistantPayload({ action: "analyze", resumeText }), "");
   assert.match(validateResumeAssistantPayload({ action: "unknown", resumeText }), /valid resume AI task/);
   assert.match(validateResumeAssistantPayload({ action: "analyze", resumeText: "too short" }), /at least 80 readable characters/);
+});
+
+test("resume AI rejects an electricity bill even when it contains enough readable text", () => {
+  const utilityBill = `Customer: Alex Kumar
+Email: alex@example.com
+Consumer Number: 1234567890
+Electricity Bill
+Bill Period: April
+Meter Reading and Units Consumed: 340 kWh
+Total Amount Due: 1,500
+Please pay before the due date.`;
+  assert.match(
+    validateResumeAssistantPayload({ action: "analyze", resumeText: utilityBill }),
+    /bill, receipt, or another non-resume document/,
+  );
 });
 
 test("job matching validates bounded candidate listings", () => {

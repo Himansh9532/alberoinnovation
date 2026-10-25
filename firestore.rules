@@ -16,5 +16,8 @@ service cloud.firestore {
     match /razorpayPayments/{paymentId} {
       allow read, write: if false;
     }
+    match /contactSubmissions/{submissionId} {
+      allow read, write: if false;
+    }
   }
 }

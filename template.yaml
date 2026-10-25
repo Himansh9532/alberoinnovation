@@ -13,11 +13,11 @@ Parameters:
   SesFromEmail:
     Type: String
     Default: ""
-    Description: Verified SES sender email address for payment receipts.
+    Description: Verified SES sender email address for payment receipts and contact form messages.
   PaymentReceiptAdminEmail:
     Type: String
     Default: Business@alberotechnologies.com
-    Description: Business email address that receives a blind copy of payment receipts.
+    Description: Business email address that receives payment receipts and contact form messages.
   FrontendDomainName:
     Type: String
     Default: albero-innovation.in
@@ -228,6 +228,12 @@ Resources:
           Properties:
             ApiId: !Ref BackendHttpApi
             Path: /api/resume-assistant
+            Method: POST
+        Contact:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendHttpApi
+            Path: /api/contact
             Method: POST
         SaveUserProfile:
           Type: HttpApi

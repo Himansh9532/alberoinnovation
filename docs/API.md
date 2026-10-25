@@ -20,6 +20,7 @@ The backend verifies Firebase ID tokens for account-specific operations. Admin l
 | `POST /api/skill-assessment` | Firebase | Generate a 20-question assessment or evaluate its answers. |
 | `POST /api/research-assistant` | Firebase | Summarize a paper abstract or answer a question about it. |
 | `POST /api/resume-assistant` | Firebase | Analyze, tailor, compare, or assess skills from resume text. |
+| `POST /api/contact` | None | Validate a website contact message, save it to the Firestore `contactSubmissions` collection, and attempt an Amazon SES email notification; limited to five messages per IP per 10 minutes. |
 | `POST /api/users/profile` | Firebase | Save or update the signed-in user's profile metadata. |
 | `GET /api/users/resume` | Firebase | Read the signed-in user's saved extracted resume text. |
 | `PUT /api/users/resume` | Firebase | Save or replace the signed-in user's extracted resume text. |
@@ -61,6 +62,10 @@ The backend verifies Firebase ID tokens for account-specific operations. Admin l
 - `"skill-gaps"`: provide a `targetRole` and 1–20 `requiredSkills`.
 
 Success returns `{ "result": ... }`; the result structure depends on the selected action and is validated by the handler.
+
+### Contact form
+
+`POST /api/contact` accepts `{ "name": "...", "email": "...", "topic": "...", "message": "..." }`. The topic must be one of the contact form's listed options, and the message may contain up to 5,000 characters. The backend stores the validated fields and server-generated submission timestamp in Firestore's `contactSubmissions` collection. Review records in Firebase Console → Firestore Database → `contactSubmissions`; browser clients have no direct read/write access to this collection. Success returns `{ "savedToDatabase": true, "emailSent": true | false }`; an SES notification failure does not undo a successful database save.
 
 ### Plan and payments
 

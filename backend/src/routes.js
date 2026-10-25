@@ -6,8 +6,10 @@ import { handleResumeAssistantRequest } from "./modules/resume/resume-assistant-
 import { handleSaveUserProfile } from "./modules/users/users-api.js";
 import { handleUserResume } from "./modules/users/resume-api.js";
 import { handleAdminLogin, handleAdminStats } from "./modules/admin/admin-api.js";
+import { handleContactRequest } from "./modules/contact/contact-api.js";
 
 export const apiRoutes = new Map([
+  ["/api/contact", handleContactRequest],
   ["/api/generate-interview", handleGenerateInterviewRequest],
   ["/api/skill-assessment", handleGenerateAssessmentRequest],
   ["/api/research-assistant", handleResearchAssistantRequest],

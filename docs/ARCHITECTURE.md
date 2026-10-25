@@ -32,7 +32,7 @@ API deployment: backend/src/lambda.js -> AWS Lambda -> API Gateway
 - `frontend/src/services/api-client.js` centralizes authenticated first-party API requests. `frontend/src/features/auth/services/` contains Firebase and local-account auth services; `frontend/src/data/` contains academic-path and browser-local data helpers.
 - `frontend/public/` contains static assets; Vite outputs production files to `frontend/dist/`.
 - `shared/` contains plan-pricing rules and SEO page metadata shared with the frontend.
-- `backend/src/modules/` groups billing, interview, jobs, research, and resume handlers. `backend/src/middleware/` contains shared CORS behavior, while `backend/src/http-server.js`, `backend/src/lambda.js`, and `backend/src/routes.js` provide the runtime adapters and route registry.
+- `backend/src/modules/` groups billing, contact, interview, jobs, research, and resume handlers. `backend/src/middleware/` contains shared CORS behavior, while `backend/src/http-server.js`, `backend/src/lambda.js`, and `backend/src/routes.js` provide the runtime adapters and route registry.
 - `api/` contains thin compatibility wrappers around the shared backend handlers. The root `server/` directory is empty and is not referenced by the active development or SAM configuration.
 - Root `scripts/` contains the combined development launcher; `frontend/scripts/` contains SEO prerendering and avatar generation.
 - `template.yaml` provisions the S3/CloudFront frontend and API Gateway/Lambda backend.
@@ -44,8 +44,9 @@ API deployment: backend/src/lambda.js -> AWS Lambda -> API Gateway
 3. Backend handlers validate payloads and verify Firebase tokens with Firebase Admin. Successful Firebase sign-ins save or update `users/{uid}` with the account email, display name, sign-in providers, login count, and login timestamps; passwords are never copied to Firestore. Extracted resume text is stored at `users/{uid}/resumes/current` and can only be read or changed through a Firebase-authenticated backend request for that UID. Plan usage is charged transactionally in Firestore before paid AI work proceeds.
 4. AI handlers call Gemini from the backend. Interview and assessment flows submit resume or answer text; the research assistant submits paper metadata, abstract, and optional short conversation. Resume features send resume and, for tailoring, job-description text. These requests are made only when the relevant feature is used.
 5. Billing creates and verifies Razorpay orders server-side, activates plans in Firestore after checking captured payment details, and attempts receipt delivery through SES.
-6. India job listings are fetched server-side from Adzuna. Other public job feeds are handled by the resume feature in the browser.
-7. Firebase users' extracted resume text, profile metadata, plan and payment state are server-side. Builder/profile snapshots and research-library data remain browser-local as described in the README.
+6. Public contact form submissions are validated and rate-limited, saved by Firebase Admin to Firestore's `contactSubmissions` collection, and followed by a best-effort SES email notification; replies are directed to the sender. Firestore rules deny browser-client access to contact submissions.
+7. India job listings are fetched server-side from Adzuna. Other public job feeds are handled by the resume feature in the browser.
+8. Firebase users' extracted resume text, profile metadata, plan and payment state are server-side. Builder/profile snapshots and research-library data remain browser-local as described in the README.
 
 The `/admin` page uses an independent username/password credential stored as a server-side scrypt hash. Admin sessions are HMAC-signed and expire after eight hours. The protected statistics endpoint reports account count, recorded sign-in count, total resume-text bytes, and recent account metadata; it does not return resume contents. Admin credentials are configured in the backend environment or the deployment Secrets Manager secret, never in browser settings.
 

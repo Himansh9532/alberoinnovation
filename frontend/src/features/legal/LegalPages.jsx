@@ -4,7 +4,7 @@ const privacySections = [
   {
     title: "Information we handle",
     paragraphs: [
-      "When you create or use an account, we handle details you provide such as your name and email address. The services can also process content you choose to enter or upload, including resume text, profile details, interview answers, job descriptions, and research questions.",
+      "When you create or use an account, we handle details you provide such as your name and email address. If you send a message through the contact form, we store your name, email address, selected topic, message, and submission time in our Firestore database so our team can respond. The services can also process content you choose to enter or upload, including resume text, profile details, interview answers, job descriptions, and research questions.",
       "Some drafts, preferences, and activity may be kept in your browser. If you choose an account or sync feature, the information described on that feature may be saved to your account so you can use it across devices.",
     ],
   },

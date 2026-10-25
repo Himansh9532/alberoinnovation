@@ -9,6 +9,7 @@ test("API route registration is shared and includes every supported endpoint", (
     "/api/billing/order",
     "/api/billing/usage",
     "/api/billing/verify-payment",
+    "/api/contact",
     "/api/generate-interview",
     "/api/jobs/india",
     "/api/research-assistant",
