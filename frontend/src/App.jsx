@@ -396,11 +396,11 @@ function SectionHeading({ eyebrow, title, description }) {
 
 function HomePage() {
   const homeTools = [
-    { icon: BarChart3, title: "Skill assessments", copy: "Practice a subject or career skill and review guidance on what to learn next.", to: "/assessment", link: "Explore assessments" },
+    { icon: BarChart3, title: "Online skill assessment", copy: "Students can practice a subject or career skill and review guidance on what to learn next.", to: "/skill-assessment", link: "Explore assessments" },
     { icon: BriefcaseBusiness, title: "AI interview practice", copy: "Prepare for role-specific and behavioral conversations at your own pace.", to: "/ai-interview", link: "See interview practice" },
     { icon: FileText, title: "Resume workspace", copy: "Review resume text, compare job terms, and work on career materials.", to: "/resume-builder", link: "Open resume tools" },
     { icon: BookOpenText, title: "Research hub", copy: "Search scholarly work by field, subject, year, and publication type.", to: "/research-assistant", link: "Find research" },
-    { icon: TrendingUp, title: "Career roadmaps", copy: "Connect your current skills with roles and practical steps to explore.", to: "/roadmap", link: "Explore roadmaps" },
+    { icon: TrendingUp, title: "Career guidance tools", copy: "College students can explore career fields, practice skills, and consider practical next steps.", to: "/career-guidance", link: "Explore career guidance" },
   ];
 
   const companyPartners = [
@@ -614,9 +614,9 @@ function StandardPage({ eyebrow, title, description, illustration, illustrationA
 
 const FEATURE_LANDING_PAGES = {
   "/resume-builder": {
-    eyebrow: "STUDENT RESUME BUILDER",
-    title: "Build a clear resume from experience you can verify.",
-    description: "Create a structured student or early-career resume with editable sections, six photo-ready templates, a live preview, and Word or print-to-PDF export.",
+    eyebrow: "RESUME BUILDER FOR FRESHERS",
+    title: "Build a clear fresher resume and check it before applying.",
+    description: "Create a structured student or fresher resume, choose an ATS-friendly template, then review resume sections and job-description keywords. The checks are guidance, not an employer ATS score.",
     illustration: "/career-resources.svg",
     illustrationAlt: "A learner organizing career resources and resume details",
     startTo: "/resume/builder",
@@ -631,8 +631,8 @@ const FEATURE_LANDING_PAGES = {
   },
   "/ai-interview": {
     eyebrow: "AI INTERVIEW PRACTICE",
-    title: "Practice interview questions for the role you want.",
-    description: "Prepare for role-focused and behavioral interviews with generated questions, a guided practice session, and feedback you can review.",
+    title: "Practice AI mock interviews for fresher roles in India.",
+    description: "Prepare for role-focused and behavioral interviews with generated questions, a guided practice session, and feedback you can review. Useful for students and freshers preparing for opportunities in India.",
     illustration: "/career-interview.svg",
     illustrationAlt: "A learner preparing for an interview",
     startTo: "/interview/start",
@@ -644,6 +644,48 @@ const FEATURE_LANDING_PAGES = {
     ],
     privacy: "Your original resume file stays on your device. The app asks before sending extracted resume text to the AI provider for tailored questions.",
     related: [{ to: "/resume-builder", label: "Build a resume first" }, { to: "/jd-match", label: "Review a job description" }],
+  },
+  "/skill-assessment": {
+    eyebrow: "ONLINE SKILL ASSESSMENT FOR STUDENTS",
+    title: "Explore a free online skill assessment for students in India.",
+    description: "Answer subject- or domain-based practice questions, then review AI feedback and suggested learning steps. The free plan includes one lifetime AI practice start shared between skill assessments and interview practice; check pricing for current limits.",
+    illustration: "/career-assessment.svg",
+    illustrationAlt: "A student reviewing skills and learning progress",
+    startTo: "/assessment",
+    startLabel: "Explore Skill Assessment",
+    benefits: [
+      ["Choose a subject or field", "Select from available academic branches, courses, and domains to focus your practice."],
+      ["Review learning feedback", "Use the result summary to identify topics to revisit and practical next steps."],
+      ["Treat results as guidance", "The practice assessment is for self-improvement, not a certified qualification or hiring decision."],
+    ],
+    privacy: "Assessment requests are processed according to your account and the SkillAI privacy policy. Review the consent and plan information shown before starting.",
+    related: [{ to: "/career-guidance", label: "Explore career guidance tools" }, { to: "/ai-interview", label: "Practice a mock interview" }],
+    faqs: [
+      ["What does an online skill assessment for students cover?", "Choose from the available academic branches, courses, and domains. Questions and feedback focus on the selected subject or field."],
+      ["Is the SkillAI skill assessment free?", "The Free plan includes one lifetime AI practice start shared between skill assessments and interview practice. Check the pricing page for current plan limits."],
+      ["Does an assessment certify my skills?", "No. It is a practice and self-improvement tool, not a certified qualification or hiring decision. Use the feedback to plan what to study next."],
+    ],
+  },
+  "/career-guidance": {
+    eyebrow: "CAREER GUIDANCE FOR COLLEGE STUDENTS",
+    title: "Practical career guidance tools for college students in India.",
+    description: "Explore your skills, practice interviews, build a resume, and review career roadmaps. Use these tools to consider next steps—your choices and goals remain your own.",
+    illustration: "/career-roadmap.svg",
+    illustrationAlt: "A college student planning possible career steps",
+    startTo: "/domains",
+    startLabel: "Explore Career Fields",
+    benefits: [
+      ["Understand skills to build", "Try a subject- or domain-based assessment and use its feedback to identify topics for further practice."],
+      ["Prepare for opportunities", "Practice role-focused interview questions and organize relevant projects, education, and experience in your resume."],
+      ["Explore possible next steps", "Review career pathways and learning resources as starting points, then verify important decisions with trusted advisors."],
+    ],
+    privacy: "SkillAI offers practice and planning tools, not professional placement or guaranteed career outcomes. Review each tool's plan, consent, and privacy details before use.",
+    related: [{ to: "/skill-assessment", label: "Try a skill assessment" }, { to: "/resume-builder", label: "Build a fresher resume" }, { to: "/ai-interview", label: "Practice an interview" }],
+    faqs: [
+      ["What career guidance tools are useful for college students?", "Skill assessments, resume-building tools, mock interview practice, and career roadmaps can help organize questions and possible next steps."],
+      ["Can a career tool choose the right career for me?", "No tool can make that decision for you. Use suggestions as a starting point and consider your interests, circumstances, and advice from people you trust."],
+      ["Can freshers use these tools?", "Yes. Students and early-career users can practice interview answers, review skills, and organize education, projects, internships, and experience."],
+    ],
   },
   "/research-assistant": {
     eyebrow: "RESEARCH PAPER FINDER",
@@ -698,6 +740,12 @@ function FeatureLandingPage({ page }) {
         </div>
       </section>
       <section className="feature-landing-privacy"><ShieldCheck size={18} /><p>{page.privacy}</p></section>
+      {page.faqs?.length > 0 && <section className="feature-landing-section" aria-labelledby="feature-landing-faq">
+        <h2 id="feature-landing-faq">Frequently asked questions</h2>
+        <div className="feature-landing-faqs">
+          {page.faqs.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}
+        </div>
+      </section>}
       <nav className="feature-landing-related" aria-label="Related SkillAI tools">
         <strong>Explore related tools</strong>
         {page.related.map((item) => <Link key={item.to} to={item.to}>{item.label} <ArrowRight size={15} /></Link>)}
@@ -3036,6 +3084,8 @@ function App() {
           <Route path="/" element={session ? <DashboardPage user={session} /> : <HomePage />} />
           <Route path="/resume-builder" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/resume-builder"]} />} />
           <Route path="/ai-interview" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/ai-interview"]} />} />
+          <Route path="/skill-assessment" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/skill-assessment"]} />} />
+          <Route path="/career-guidance" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/career-guidance"]} />} />
           <Route path="/research-assistant" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/research-assistant"]} />} />
           <Route path="/jd-match" element={<FeatureLandingPage page={FEATURE_LANDING_PAGES["/jd-match"]} />} />
           <Route path="/domains" element={requireSession(<DomainsPage />)} />

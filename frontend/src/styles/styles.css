@@ -194,6 +194,31 @@ input {
   color: var(--text-soft);
 }
 
+.feature-landing-faqs {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.feature-landing-faqs details {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.feature-landing-faqs summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.feature-landing-faqs p {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  line-height: 1.65;
+}
+
 .nav-dropdown-heading {
   position: relative;
   padding: 8px 0;

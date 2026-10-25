@@ -3,8 +3,8 @@ export const SEO_IMAGE_URL = `${SEO_SITE_URL}/career-learning-team.jpg`;
 
 export const SEO_PAGES = {
   "/": {
-    title: "Online Skill Assessment & Career Tools | SkillAI",
-    description: "Build job-ready skills with online assessments, AI mock interview practice, a student resume builder, and practical career tools from SkillAI.",
+    title: "Career Guidance Tools for College Students | SkillAI",
+    description: "Explore career guidance tools for college students in India, including skill assessments, AI mock interview practice, resume tools, and career roadmaps.",
   },
   "/pricing": {
     title: "SkillAI Pricing | Interview Practice & Skill Assessments",
@@ -23,12 +23,20 @@ export const SEO_PAGES = {
     description: "Read the terms for using SkillAI learning, assessment, interview-practice, research, and career-support tools.",
   },
   "/resume-builder": {
-    title: "Online Resume Builder for Students | SkillAI",
-    description: "Create a student or early-career resume online. Organize education, projects, internships, and skills, preview templates, then export to Word or PDF.",
+    title: "ATS-Friendly Resume Builder & Resume Checker for Freshers | SkillAI",
+    description: "Use an ATS-friendly resume builder for freshers, then check resume sections and job-description keywords. This is guidance, not an employer ATS score. Export to Word or PDF.",
   },
   "/ai-interview": {
-    title: "AI Mock Interview Practice for Students | SkillAI",
-    description: "Prepare for job interviews with role-focused and behavioral practice questions. Complete a guided mock interview and review feedback on your answers.",
+    title: "AI Mock Interview Practice for Freshers in India | SkillAI",
+    description: "Practice role-focused and behavioral mock interview questions with AI. Freshers and students in India can complete a guided session and review feedback.",
+  },
+  "/skill-assessment": {
+    title: "Free Online Skill Assessment for Students in India | SkillAI",
+    description: "Explore an online skill assessment for students in India. Practice subject- and domain-based questions, review AI feedback, and choose useful next learning steps.",
+  },
+  "/career-guidance": {
+    title: "Career Guidance Tools for College Students in India | SkillAI",
+    description: "Explore career guidance tools for college students in India, including skill assessments, career roadmaps, AI interview practice, and resume tools.",
   },
   "/research-assistant": {
     title: "Research Paper Finder & Abstract Assistant | SkillAI",

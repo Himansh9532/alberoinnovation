@@ -9,5 +9,7 @@
 - [Contact](https://www.albero-innovation.in/contact/): Contact the team for help, feedback, or partnership enquiries.
 - [Student resume builder](https://www.albero-innovation.in/resume-builder/): Create and export a student or early-career resume.
 - [AI interview practice](https://www.albero-innovation.in/ai-interview/): Practice role-focused and behavioral interview questions.
+- [Online skill assessment](https://www.albero-innovation.in/skill-assessment/): Practice academic or career skills and review learning feedback.
+- [Career guidance tools](https://www.albero-innovation.in/career-guidance/): Explore skill assessments, resume tools, interview practice, and career roadmaps for students.
 - [Research paper finder](https://www.albero-innovation.in/research-assistant/): Search scholarly papers and explore available abstracts.
 - [Resume job description matcher](https://www.albero-innovation.in/jd-match/): Compare resume content with a job description.
